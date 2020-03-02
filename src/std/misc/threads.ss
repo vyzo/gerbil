@@ -3,7 +3,8 @@
 ;;; miscellaneous thread utilities
 
 (import :gerbil/gambit/threads
-        :std/sugar)
+        :std/sugar
+        :std/contract)
 (export primordial-thread-group
         thread-group->thread-list* all-threads
         thread-dead?
@@ -139,23 +140,17 @@
 (def (thread-abort! thread)
   (thread-raise! thread +thread-abort+))
 
-(def (thread-raise! thread obj)
-  (cond
-   ((not (thread? thread))
-    (error "Bad argument; expected thread" thread))
-   ((eq? thread (current-thread))
-    (raise obj))
-   (else
-    (thread-intr! thread (cut raise obj)))))
+(def/c (thread-raise! thread obj)
+  (@contract (thread? thread))
+  (if (eq? thread (current-thread))
+    (raise obj)
+    (thread-intr! thread (cut raise obj))))
 
-(def (thread-async! thread thunk)
-  (cond
-   ((not (thread? thread))
-    (error "Bad argument; expected thread" thread))
-   ((eq? thread (current-thread))
-    (thunk))
-   (else
-    (thread-intr! thread thunk))))
+(def/c (thread-async! thread thunk)
+  (@contract (thread? thread) (procedure? thunk))
+   (if (eq? thread (current-thread))
+    (thunk)
+    (thread-intr! thread thunk)))
 
 (extern thread-intr!)
 

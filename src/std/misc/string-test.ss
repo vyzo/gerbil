@@ -3,11 +3,8 @@
 (import
   :std/misc/string :std/srfi/13
   :std/test :gerbil/gambit/exceptions
+  :std/contract
   :std/pregexp)
-
-(def (error-with-message? message)
-  (lambda (e)
-    (and (error-exception? e) (equal? (error-exception-message e) message))))
 
 (def string-test
   (test-suite "test :std/misc/string"
@@ -39,7 +36,7 @@
      (check-equal? (string-subst "abb"          "b*" "_" count: #f) "abb")
      (check-exception
       (string-subst "abc" "b" "_" count: #t)
-      (error-with-message? "Illegal argument; count must be a fixnum or #f, got:"))
+      contract-violation?)
      ;; empty old
      (check-equal? (string-subst ""     "" "_"  count: 1)  "_")
      (check-equal? (string-subst "a"    "" "_"  count: 1)  "_a")

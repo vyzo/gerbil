@@ -48,10 +48,12 @@
   (id state-id))
 
 (define (make-state accept? chars match match-rule next1 next2 id)
-  (if (and next1 (not (state? next1)))
-      (error "expected a state" next1))
-  (if (and next2 (not (state? next2)))
-      (error "expected a state" next2))
+  (begin-annotation @runtime-check
+    (begin
+      (if (and next1 (not (state? next1)))
+        (error "expected a state" next1))
+      (if (and next2 (not (state? next2)))
+        (error "expected a state" next2))))
   (%make-state accept? chars match match-rule next1 next2 id))
 
 (define ~none 0)

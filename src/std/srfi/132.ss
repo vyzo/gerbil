@@ -19,8 +19,9 @@
 
 (defrules assert ()
   ((_ x)
-   (unless x
-     (error "assertion failure"))))
+   (begin-annotation @runtime-check
+     (unless x
+       (error "assertion failure")))))
 
 (def (r7rs-vector-copy v start end)
   (subvector v start end))

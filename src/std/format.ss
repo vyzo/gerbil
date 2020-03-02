@@ -4,6 +4,7 @@
 
 (export format printf fprintf eprintf)
 (import
+  :std/contract
   (only-in :gerbil/gambit/ports
            open-output-string
            get-output-string
@@ -16,9 +17,8 @@
   (only-in :std/misc/repr
            print-representation))
 
-(def (format fmt . args)
-  (unless (string? fmt)
-    (error "Expected format string" fmt))
+(def/c (format fmt . args)
+  (@contract (string? fmt))
   (let (out (open-output-string))
     (dofmt out fmt args)
     (get-output-string out)))
@@ -26,11 +26,9 @@
 (def (printf fmt . args)
   (apply fprintf (current-output-port) fmt args))
 
-(def (fprintf port fmt . args)
-  (unless (output-port? port)
-    (error "Expected output port" port))
-  (unless (string? fmt)
-    (error "Expected format string" fmt))
+(def/c (fprintf port fmt . args)
+  (@contract (output-port? port)
+             (string? fmt))
   (dofmt port fmt args))
 
 (def (eprintf fmt . args)

@@ -3,27 +3,31 @@
 ;;; string<->utf8 conversion without intermediate ports
 
 (import :gerbil/gambit/bits
-        :std/error)
+        :std/error
+        :std/contract)
 (export string->utf8 utf8->string
         utf8-encode utf8-decode
         string-utf8-length)
 
 (declare (not safe))
 
-(def (string->utf8 str (start 0) (end (string-length str)))
-  (if (string? str)
-    (utf8-encode str start end)
-    (error "Bad argument; expected string" str)))
+(def/c (string->utf8 str (start 0) (end (string-length str)))
+  (@contract (string? str)
+             (and (fixnum? start) (fixnum? end)
+                  (fx<= 0 start end (string-length str))))
+  (utf8-encode str start end))
 
-(def (string-utf8-length str (start 0) (end (string-length str)))
-  (if (string? str)
-    (utf8-encode-length str start end)
-    (error "Bad argument; expected string" str)))
+(def/c (string-utf8-length str (start 0) (end (string-length str)))
+  (@contract (string? str)
+             (and (fixnum? start) (fixnum? end)
+                  (fx<= 0 start end (string-length str))))
+  (utf8-encode-length str start end))
 
-(def (utf8->string u8v (start 0) (end (u8vector-length u8v)))
-  (if (u8vector? u8v)
-    (utf8-decode u8v start end)
-    (error "Bad argument; expected u8vector" u8v)))
+(def/c (utf8->string u8v (start 0) (end (u8vector-length u8v)))
+  (@contract (u8vector? u8v)
+             (and (fixnum? start) (fixnum? end)
+                  (fx<= 0 start end (u8vector-length u8v))))
+  (utf8-decode u8v start end))
 
 (def (utf8-encode str start end)
   (let* ((slen (fx- end start))

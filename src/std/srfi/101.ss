@@ -60,6 +60,8 @@
 (defalias bitwise-arithmetic-shift arithmetic-shift)
 
 (defrules assert ()
-  ((_ e) (unless e (error "assertion failure" 'e))))
+  ((_ e)
+   (begin-annotation @runtime-check
+     (unless e (error "assertion failure" 'e)))))
 
 (include "srfi-101.scm")

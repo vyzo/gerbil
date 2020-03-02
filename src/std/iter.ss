@@ -6,7 +6,7 @@
         :gerbil/gambit/misc
         :std/generic
         :std/coroutine
-        )
+        :std/contract)
 (export
   (struct-out iterator)
   iter :iter iter-end iter-end? iter-next! iter-fini!
@@ -122,7 +122,10 @@
           val))))
   (make-iterator port next))
 
-(def (iter-in-iota start count step)
+(def/c (iter-in-iota start count step)
+  (@contract (number? start)
+             (fixnum? count)
+             (number? step))
   (declare (not safe))
   (def (next it)
     (let (e (&iterator-e it))
@@ -133,9 +136,6 @@
             (set! (cdr e) (fx1- limit))
             value)
           iter-end))))
-  (unless (and (number? start) (fixnum? count) (number? step))
-    (error "Parameters are of wrong type (count:fixnum start:number step:number)."
-      count start step))
   (make-iterator (cons start count) next))
 
 (def* in-iota
@@ -145,7 +145,10 @@
 
 (defrules defiter-in-range ()
   ((_ iter-in-range cmp)
-   (def (iter-in-range start end step)
+   (def/c (iter-in-range start end step)
+     (@contract (real? start)
+                (real? end)
+                (real? step))
      (declare (not safe))
      (def (next it)
        (let (e (&iterator-e it))
@@ -154,8 +157,6 @@
              (set! (&iterator-e it) (+ e step))
              e)
            iter-end)))
-     (unless (and (real? start) (real? end) (real? step))
-       (error "Parameters are of wrong type; expected real numbers" start end step))
      (make-iterator start next))))
 
 (defiter-in-range iter-in-range< <)

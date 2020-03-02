@@ -9,6 +9,7 @@
         :std/net/address
         :std/text/utf8
         :std/sugar
+        :std/contract
         (only-in :gerbil/gambit/ports close-port)
         (for-syntax :std/stxutil))
 
@@ -401,11 +402,10 @@
   (check-os-error (_getsockopt_int (fd-e sock) level opt)
     (socket-getsockopt sock level opt)))
 
-(def (socket-setsockopt-int sock level opt val)
-  (if (fixnum? val)
-    (check-os-error (_setsockopt_int (fd-e sock) level opt val)
-      (socket-setsockopt sock level opt val))
-    (error "Bad argument; expected fixnum" val)))
+(def/c (socket-setsockopt-int sock level opt val)
+  (@contract (fixnum? val))
+  (check-os-error (_setsockopt_int (fd-e sock) level opt val)
+    (socket-setsockopt sock level opt val)))
 
 (def (socket-getsockopt-tv sock level opt)
   (let (tv (check-ptr (make_tv)))
@@ -413,17 +413,16 @@
       (socket-getsockopt sock level opt))
     (+ (tv_sec tv) (/ (tv_usec tv) 1e6))))
 
-(def (socket-setsockopt-tv sock level opt tm)
-  (if (real? tm)
-    (let* ((tm-sec (floor tm))
-           (tm-frac (- tm tm-sec))
-           (tm-usec (floor (* tm-frac 1e6)))
-           (tv (check-ptr (make_tv))))
-      (tv_sec_set tv (inexact->exact tm-sec))
-      (tv_usec_set tv (inexact->exact tm-usec))
-      (check-os-error (_setsockopt_tv (fd-e sock) level opt tv)
-        (socket-setsockopt sock level opt tm)))
-    (error "Bad argument; expected real" tm)))
+(def/c (socket-setsockopt-tv sock level opt tm)
+  (@contract (real? tm))
+  (let* ((tm-sec (floor tm))
+         (tm-frac (- tm tm-sec))
+         (tm-usec (floor (* tm-frac 1e6)))
+         (tv (check-ptr (make_tv))))
+    (tv_sec_set tv (inexact->exact tm-sec))
+    (tv_usec_set tv (inexact->exact tm-usec))
+    (check-os-error (_setsockopt_tv (fd-e sock) level opt tv)
+      (socket-setsockopt sock level opt tm))))
 
 (def (socket-getsockopt-addr-in sock level opt)
   (let (sa (make-socket-address-in))
@@ -442,47 +441,39 @@
     (check-os-error (_setsockopt_sa (fd-e sock) level opt sa)
       (socket-setsockopt sock level opt addr))))
 
-(def (socket-getsockopt-bytes sock level opt bytes)
-  (if (u8vector? bytes)
-    (check-os-error (_getsockopt_bytes (fd-e sock) level opt bytes)
-      (socket-getsockopt sock level opt bytes))
-    (error "Bad argument; expected bytes" bytes)))
+(def/c (socket-getsockopt-bytes sock level opt bytes)
+  (@contract (u8vector? bytes))
+  (check-os-error (_getsockopt_bytes (fd-e sock) level opt bytes)
+    (socket-getsockopt sock level opt bytes)))
 
-(def (socket-setsockopt-bytes sock level opt bytes)
-  (if (u8vector? bytes)
-    (check-os-error (_setsockopt_bytes (fd-e sock) level opt bytes)
-      (socket-setsockopt sock level opt bytes))
-    (error "Bad argument; expected bytes" bytes)))
+(def/c (socket-setsockopt-bytes sock level opt bytes)
+  (@contract (u8vector? bytes))
+  (check-os-error (_setsockopt_bytes (fd-e sock) level opt bytes)
+    (socket-setsockopt sock level opt bytes)))
 
-(def (socket-setsockopt-mreq sock level opt ips)
-  (match ips
-    ((cons maddr laddr)
-     (let ((maddr (ip4-address maddr))
-           (laddr (ip4-address laddr)))
-     (check-os-error (_setsockopt_mreq (fd-e sock) level opt maddr laddr)
-       (socket-setsockopt sock level opt ips))))
-    (else
-     (error "Bad argument; expected pair of ip4 addresses" ips))))
+(def/c (socket-setsockopt-mreq sock level opt ips)
+  (@contract (and (pair? ips) (ip4-address? (car ips)) (ip4-address? (cdr ips))))
+  (with ([maddr . laddr] ips)
+    (let ((maddr (ip4-address maddr))
+          (laddr (ip4-address laddr)))
+      (check-os-error (_setsockopt_mreq (fd-e sock) level opt maddr laddr)
+        (socket-setsockopt sock level opt ips)))))
 
-(def (socket-setsockopt-mreq-src sock level opt ips)
-  (match ips
-    ([maddr iaddr saddr]
-     (let ((maddr (ip4-address maddr))
-           (iaddr (ip4-address iaddr))
-           (saddr (ip4-address saddr)))
-     (check-os-error (_setsockopt_mreq_src (fd-e sock) level opt maddr iaddr saddr)
-       (socket-setsockopt sock level opt ips))))
-    (else
-     (error "Bad argument; expected list with 3 ip4 addresses" ips))))
+(def/c (socket-setsockopt-mreq-src sock level opt ips)
+  (@contract (and (list? ips) (andmap ip4-address? ips)))
+  (with ([maddr iaddr saddr] ips)
+    (let ((maddr (ip4-address maddr))
+          (iaddr (ip4-address iaddr))
+          (saddr (ip4-address saddr)))
+      (check-os-error (_setsockopt_mreq_src (fd-e sock) level opt maddr iaddr saddr)
+        (socket-setsockopt sock level opt ips)))))
 
-(def (socket-setsockopt-mreq6 sock level opt ips)
-  (match ips
-    ((cons maddr ifindex)
-     (let (maddr (ip6-address maddr))
-     (check-os-error (_setsockopt_mreq6 (fd-e sock) level opt maddr ifindex)
-       (socket-setsockopt sock level opt ips))))
-    (else
-     (error "Bad argument; expected pair of ip6 addresses" ips))))
+(def/c (socket-setsockopt-mreq6 sock level opt ips)
+  (@contract (and (pair? ips) (ip6-address? (car ips))))
+  (with ([maddr . ifindex] ips)
+    (let (maddr (ip6-address maddr))
+      (check-os-error (_setsockopt_mreq6 (fd-e sock) level opt maddr ifindex)
+        (socket-setsockopt sock level opt ips)))))
 
 (def (socket-getsockopt-linger sock level opt)
   (let (linger (check-ptr (make_linger)))
@@ -492,17 +483,16 @@
       #f
       (linger_linger linger))))
 
-(def (socket-setsockopt-linger sock level opt val)
+(def/c (socket-setsockopt-linger sock level opt val)
+  (@contract (or (fixnum? val) (not val)))
   (let (linger (check-ptr (make_linger)))
     (cond
      ((fixnum? val)
       (linger_onoff_set linger 1)
       (linger_linger_set linger val))
-     ((not val)
+     (else                              ; (not val)
       (linger_onoff_set linger 0)
-      (linger_linger_set linger 0))
-     (else
-      (error "Bad argument; expected fixnum or #f" val)))
+      (linger_linger_set linger 0)))
     (check-os-error (_setsockopt_linger sock level opt linger)
       (socket-setsockopt sock level opt val))))
 

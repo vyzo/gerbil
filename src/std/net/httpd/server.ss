@@ -12,7 +12,8 @@
         :std/actor/proto
         :std/misc/threads
         :std/logger
-        :std/sugar)
+        :std/sugar
+        :std/contract)
 (export start-http-server!
         stop-http-server!
         http-register-handler
@@ -45,12 +46,10 @@
       (thread-group-kill! tgroup)))))
 
 ;; handler: lambda (request response)
-(def (http-register-handler httpd path handler (host #f))
-  (if (string? path)
-    (if (procedure? handler)
-      (!!httpd.register httpd host path handler)
-      (error "Bad handler; expected procedure" handler))
-    (error "Bad path; expected string" path)))
+(def/c (http-register-handler httpd path handler (host #f))
+  (@contract (string? path)
+             (procedure? handler))
+  (!!httpd.register httpd host path handler))
 
 ;;; implementation
 (def (http-server socks sas mux)

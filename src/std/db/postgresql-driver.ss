@@ -17,6 +17,7 @@
         :std/logger
         :std/sugar
         :std/error
+        :std/contract
         :std/db/dbi)
 (export postgresql-connect!
         postgresql-prepare-statement!
@@ -81,17 +82,15 @@
   (with-driver conn driver
     (!!postgresql.query driver name bind)))
 
-(def (postgresql-continue! conn token)
-  (if (!token? token)
-    (with-driver conn driver
-      (!!postgresql.continue driver token))
-    (error "Bad argument; illegal query token" token)))
+(def/c (postgresql-continue! conn token)
+  (@contract (!token? token))
+  (with-driver conn driver
+    (!!postgresql.continue driver token)))
 
-(def (postgresql-reset! conn token)
-  (if (!token? token)
-    (alet (driver (get-driver conn))
-      (!!postgresql.reset driver token))
-    (error "Bad argument; illegal query token" token)))
+(def/c (postgresql-reset! conn token)
+  (@contract (!token? token))
+  (alet (driver (get-driver conn))
+    (!!postgresql.reset driver token)))
 
 (def (postgresql-close! conn)
   (alet (driver (get-driver conn))

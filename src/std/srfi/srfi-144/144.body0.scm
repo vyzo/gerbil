@@ -11,10 +11,11 @@
               (* 2.0 x)))))
 
 (define (check-flonum! name x)
-  (if (not (flonum? x))
+  (begin-annotation @runtime-check
+    (if (not (flonum? x))
       (error (string-append "non-flonum argument passed to "
                             (symbol->string name))
-             x)))
+        x))))
 
 ;;; Given a symbol naming a flonum procedure and a generic operation,
 ;;; returns a flonum procedure that restricts the generic operation
@@ -24,10 +25,11 @@
   (lambda (x)
     (check-flonum! name x)
     (let ((result (op x)))
-      (if (not (flonum? result))
+      (begin-annotation @runtime-check
+        (if (not (flonum? result))
           (error (string-append "non-flonum result from "
                                 (symbol->string name))
-                 result))
+            result)))
       result)))
 
 (define (flop2 name op)
@@ -35,10 +37,11 @@
     (check-flonum! name x)
     (check-flonum! name y)
     (let ((result (op x y)))
-      (if (not (flonum? result))
+      (begin-annotation @runtime-check
+        (if (not (flonum? result))
           (error (string-append "non-flonum result from "
                                 (symbol->string name))
-                 result))
+            result)))
       result)))
 
 (define (flop3 name op)
@@ -47,10 +50,11 @@
     (check-flonum! name y)
     (check-flonum! name z)
     (let ((result (op x y z)))
-      (if (not (flonum? result))
+      (begin-annotation @runtime-check
+        (if (not (flonum? result))
           (error (string-append "non-flonum result from "
                                 (symbol->string name))
-                 result))
+            result)))
       result)))
 
 ;;; Given a flonum x and a list of flonum coefficients for a polynomial,

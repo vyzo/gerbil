@@ -6,7 +6,7 @@
 
 (defrules check-arg ()
   ((_ pred val caller)
-   (if (pred val) val
+   (if (begin-annotation @runtime-check (pred val)) val
        (error "Bad argument" val 'pred 'caller))))
 
 (defrules let-optionals ()
@@ -26,7 +26,7 @@
       ((null? maybe-arg) default-exp)
       ((null? (cdr maybe-arg))
        (let ((val (car maybe-arg)))
-         (if (check-proc val) val
+         (if (begin-annotation @runtime-check (check-proc val)) val
              (error "argument out of domain" val))))
       (else (error "too many optional arguments" maybe-arg))))))
 
@@ -38,7 +38,7 @@
                              (values default1 '())
                              (values (car args) (cdr args))))
      (lambda (var1 rest)
-       (if (and typecheck ...)
+       (if (begin-annotation @runtime-check (and typecheck ...))
          (recur rest (etc ...)
                 body1 ...)
          (error "argument out of domain" var1)))))

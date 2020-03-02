@@ -11,6 +11,7 @@
         :std/logger
         :std/sugar
         :std/error
+        :std/contract
         :std/pregexp
         (only-in :std/srfi/1 reverse!))
 (export http-request-handler
@@ -289,10 +290,9 @@ END-C
 
 (defrules defsetter ()
   ((_ (setf id) pred)
-   (def (setf val)
-     (if (? pred val)
-       (set! id val)
-       (error "Cannot set httpd parameter; Bad argument" val)))))
+   (def/c (setf val)
+     (@contract (? pred val))
+     (set! id val))))
 
 (defsetter (set-httpd-request-timeout! request-timeout)
   (or not real? time?))

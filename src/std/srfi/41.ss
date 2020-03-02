@@ -2,7 +2,8 @@
 ;;; (c) vyzo at hackzen.org
 ;;; SRFI-41: streams library
 
-(import :std/srfi/9)
+(import :std/srfi/9
+        :std/contract)
 (export
   stream-type
   stream-lazy stream-eager stream-delay stream-force
@@ -33,6 +34,5 @@
   stream-scan
   stream-take stream-take-while
   stream-unfold stream-unfolds
-  stream-zip
-  )
+  stream-zip)
 (include "srfi-41.scm")

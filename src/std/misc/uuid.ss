@@ -5,6 +5,7 @@
 (import :std/pregexp
         :std/text/hex
         :std/text/utf8
+        :std/contract
         (only-in :std/crypto/digest md5)
         (only-in :std/crypto/etc random-bytes!)
         (only-in :gerbil/gambit/hash equal?-hash))
@@ -58,10 +59,10 @@
     (string->uuid str)
     (content-uuid str)))
 
-(def (u8vector->uuid u8v)
-  (if (##fx= (u8vector-length u8v) uuid-length)
-    (make-uuid u8v #f)
-    (error "Bad argument; invalid u8vector length" u8v)))
+(def/c (u8vector->uuid u8v)
+  (@contract (u8vector? u8v)
+             (fx= (u8vector-length u8v) uuid-length))
+  (make-uuid u8v #f))
 
 (def (uuid->u8vector uuid)
   (uuid-bytes uuid))

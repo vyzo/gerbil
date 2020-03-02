@@ -7,6 +7,7 @@
         :gerbil/gambit/bits
         :gerbil/gambit/misc
         :std/error
+        :std/contract
         :std/sugar
         :std/logger
         :std/misc/completion
@@ -109,18 +110,18 @@
 
 ;; synchronous client interface
 ;; => (values details args kws)
-(def (wamp-call cli name opts args kws)
-  (unless (string? name)
-    (error "Bad argument; expected string" name))
+(def/c (wamp-call cli name opts args kws)
+  (@contract (string? name))
   (!!wamp.call cli name opts args kws))
 
-(def (wamp-publish cli topic opts args kws)
-  (unless (string? topic)
-    (error "Bad argument; expected string" topic))
+(def/c (wamp-publish cli topic opts args kws)
+  (@contract (string? topic))
   (!!wamp.publish cli topic opts args kws))
 
 ;; => object-port of (values details args kws)
-(def (wamp-subscribe cli topic)
+(def/c (wamp-subscribe cli topic)
+  (@contract (string? topic))
+
   (def (event-handler outp)
     (try
      (!!wamp.subscribe cli topic #f)
@@ -138,9 +139,6 @@
        (write e outp)
        (close-port outp))))
 
-  (unless (string? topic)
-    (error "Bad argument; expected string" topic))
-
   (let* (((values inp outp)
           (open-vector-pipe [permanent-close: #t direction: 'input]
                             [permanent-close: #t direction: 'output]))
@@ -149,11 +147,9 @@
     (make-will inp (lambda (_) (close)))
     (values inp close)))
 
-(def (wamp-register cli proc name opts)
-  (unless (procedure? proc)
-    (error "Bad argument; expected procedure" proc))
-  (unless (string? name)
-    (error "Bad argument; expected string" name))
+(def/c (wamp-register cli proc name opts)
+  (@contract (procedure? proc)
+             (string? name))
   (!!wamp.register cli proc name opts))
 
 (def (wamp-unregister cli name)

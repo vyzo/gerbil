@@ -4,14 +4,14 @@
 
 (import :gerbil/gambit/fixnum
         :std/misc/bytes
-        :std/error)
+        :std/error
+        :std/contract)
 (export string->utf32 utf32->string)
 
 (declare (not safe))
 
-(def (string->utf32 str (endianness big) (BOM? #f))
-  (unless (string? str)
-    (error "Expected string" str))
+(def/c (string->utf32 str (endianness big) (BOM? #f))
+  (@contract (string? str))
   (let (u32-set!
         (case endianness
           ((big) u32-set!/be)
@@ -39,9 +39,8 @@
         (lp (fx1+ i) (fx+ j 4)))
       bytes)))
 
-(def (utf32->string bytes (endianness big) (endianness-mandatory? #f))
-  (unless (u8vector? bytes)
-    (error "Expected u8vector" bytes))
+(def/c (utf32->string bytes (endianness big) (endianness-mandatory? #f))
+  (@contract (u8vector? bytes))
   (let (u32-ref
         (case endianness
           ((big) u32-ref/be)

@@ -144,14 +144,14 @@
                (fl- x)))))
 
 (define (make-flonum x n)
+  (begin-annotation @runtime-check
+      (when (or (not (flonum? x))
+                (not (exact-integer? n)))
+        (error "bad arguments to make-flonum" x n)))
   (let ((y (expt 2.0 n)))
-    (cond ((or (not (flonum? x))
-               (not (exact-integer? n)))
-           (error "bad arguments to make-flonum" x n))
-          ((finite? y)
-           (* x y))
-          (else
-           (inexact (* (exact x) (expt 2 n)))))))
+    (if (finite? y)
+      (* x y)
+      (inexact (* (exact x) (expt 2 n))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

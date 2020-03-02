@@ -63,40 +63,51 @@
 
 (define (bag? obj) (and (sob? obj) (sob-multi? obj)))
 
-(define (check-set obj) (if (not (set? obj)) (error "not a set" obj)))
+(define (check-set obj)
+  (begin-annotation @runtime-check
+    (if (not (set? obj)) (error "not a set" obj))))
 
-(define (check-bag obj) (if (not (bag? obj)) (error "not a bag" obj)))
+(define (check-bag obj)
+  (begin-annotation @runtime-check
+    (if (not (bag? obj)) (error "not a bag" obj))))
 
 ;; These procedures verify that not only are their arguments all sets
 ;; or all bags as the case may be, but also share the same comparator.
 
 (define (check-all-sets list)
-  (for-each (lambda (obj) (check-set obj)) list)
-  (sob-check-comparators list))
+  (begin-annotation @runtime-check
+    (begin
+      (for-each (lambda (obj) (check-set obj)) list)
+      (sob-check-comparators list))))
 
 (define (check-all-bags list)
-  (for-each (lambda (obj) (check-bag obj)) list)
-  (sob-check-comparators list))
+  (begin-annotation @runtime-check
+    (begin
+      (for-each (lambda (obj) (check-bag obj)) list)
+      (sob-check-comparators list))))
 
 (define (sob-check-comparators list)
-  (if (not (null? list))
+  (begin-annotation @runtime-check
+    (if (not (null? list))
       (for-each
         (lambda (sob)
           (check-same-comparator (car list) sob))
-        (cdr list))))
+        (cdr list)))))
 
 ;; This procedure is used directly when there are exactly two arguments.
 
 (define (check-same-comparator a b)
-  (if (not (eq? (sob-comparator a) (sob-comparator b)))
-    (error "different comparators" a b)))
+  (begin-annotation @runtime-check
+    (if (not (eq? (sob-comparator a) (sob-comparator b)))
+      (error "different comparators" a b))))
 
 ;; This procedure defends against inserting an element
 ;; into a sob that violates its constructor, since
 ;; typical hash-table implementations don't check for us.
 
 (define (check-element sob element)
-  (comparator-check-type (sob-comparator sob) element))
+  (begin-annotation @runtime-check
+    (comparator-check-type (sob-comparator sob) element)))
 
 ;;; Constructors
 
@@ -357,7 +368,8 @@
   (let* ((comparator (sob-comparator sob))
          (= (comparator-equality-predicate comparator))
          (ht (sob-hash-table sob)))
-    (comparator-check-type comparator element)
+    (begin-annotation @runtime-check
+      (comparator-check-type comparator element))
     (call/cc
       (lambda (return)
         (hash-table-for-each

@@ -286,7 +286,7 @@
                 for/fold
                  )
               'scheme-indent-function 2)
-  (gerbil-put '(def defvalues extern
+  (gerbil-put '(def defvalues def/c def*/c extern
                 defalias defsyntax defrule defrules defrules*
                 defstruct defclass defgeneric defmethod
                 definline definline*
@@ -401,6 +401,14 @@
      (2 font-lock-function-name-face)))
   (gerbil-fontlock-add
    '("(\\(definline[*]?\\)\\s-+(?\\(\\sw+\\)"
+     (1 font-lock-keyword-face)
+     (2 font-lock-function-name-face)))
+  (gerbil-fontlock-add
+   '("(\\(def/c\\)\\s-+(\\(\\sw+\\)"
+     (1 font-lock-keyword-face)
+     (2 font-lock-function-name-face)))
+  (gerbil-fontlock-add
+   '("(\\(def[*]/c\\)\\s-+\\(\\sw+\\)"
      (1 font-lock-keyword-face)
      (2 font-lock-function-name-face)))
   (gerbil-fontlock-add

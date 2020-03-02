@@ -3,6 +3,7 @@
 ;;; actor rpc base
 
 (import :gerbil/gambit/threads
+        :std/contract
         :std/misc/uuid
         :std/misc/sync
         :std/net/bio
@@ -65,9 +66,8 @@
 (def +protocols+
   (make-uuid-table))
 
-(def (bind-protocol! id proto)
-  (unless (!protocol? proto)
-    (error "Bad protocol" proto))
+(def/c (bind-protocol! id proto)
+  (@contract (!protocol? proto))
   (hash-put! +protocols+ (UUID id) proto))
 
 (def (lookup-protocol uuid)

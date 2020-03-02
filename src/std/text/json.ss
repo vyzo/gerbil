@@ -19,19 +19,23 @@
         :gerbil/gambit/bits
         :gerbil/gambit/exact
         :std/error
+        :std/contract
         (only-in :std/srfi/1 reverse!))
 (export read-json write-json
         string->json-object json-object->string
         json-symbolic-keys)
 (declare (not safe))
 
-(def (read-json (port (current-input-port)))
+(def/c (read-json (port (current-input-port)))
+  (@contract (input-port? port))
   (read-json-object port #f))
 
-(def (string->json-object str)
+(def/c (string->json-object str)
+  (@contract (string? str))
   (read-json-object (open-input-string str) #f))
 
-(def (write-json obj (port (current-output-port)))
+(def/c (write-json obj (port (current-output-port)))
+  (@contract (output-port? port))
   (write-json-object obj port))
 
 (def (json-object->string obj)

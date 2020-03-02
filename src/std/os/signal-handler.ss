@@ -4,8 +4,10 @@
 
 (import :gerbil/gambit/threads
         :std/os/signal
+        :std/foreign
         :std/logger
-        :std/sugar)
+        :std/sugar
+        :std/contract)
 
 (cond-expand
   (linux (import :std/os/signalfd))
@@ -16,15 +18,13 @@
 (def system-signal-handler
   (delay (make-signal-handler)))
 
-(def (add-signal-handler! signo thunk)
-  (unless (and (fx> signo 0) (fx< signo SIGMAX))
-    (error "Invalid signal" signo))
+(def/c (add-signal-handler! signo thunk)
+  (@contract (and (fx> signo 0) (fx< signo SIGMAX)) (procedure? thunk))
   (let (handler (force system-signal-handler))
     (signal-handler-add! handler signo thunk)))
 
-(def (remove-signal-handler! signo)
-  (unless (and (fx> signo 0) (fx< signo SIGMAX))
-    (error "Invalid signal" signo))
+(def/c (remove-signal-handler! signo)
+  (@contract (and (fx> signo 0) (fx< signo SIGMAX)))
   (let (handler (force system-signal-handler))
     (signal-handler-remove! handler signo)))
 
@@ -167,12 +167,8 @@
        (when (vector-ref default-handlers signo)
          (set-signal! signo default-handler))))
 
-   (begin-foreign
+   (begin-ffi (SIG_IGN set-signal!)
      (c-declare "#include <signal.h>")
-
-     (namespace ("std/os/signal-handler#"
-                 SIG_IGN
-                 set-signal!))
 
      (define SIG_IGN
        ((c-lambda () (pointer "void") "___return((void *)SIG_IGN);")))

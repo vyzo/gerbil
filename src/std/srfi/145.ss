@@ -6,5 +6,6 @@
 
 (defrules assume ()
   ((_ expr message ...)
-   (let (val expr)
-     (if val val (error message ...)))))
+   (begin-annotation @runtime-check
+     (unless expr
+       (error message ...)))))

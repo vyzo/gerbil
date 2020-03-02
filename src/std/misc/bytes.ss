@@ -8,7 +8,8 @@
         :gerbil/gambit/bits
         :gerbil/gambit/fixnum
         :std/text/hex
-        :std/foreign)
+        :std/foreign
+        :std/contract)
 (export
   ;; Endianness
   endianness big little native native-endianness
@@ -140,24 +141,19 @@
 (defalias sint-list->bytevector sint-list->u8vector)
 
 (defrules check-int-ref ()
-  ((_ v k size)
-   (begin
-     (unless (u8vector? v)
-       (error "Expected u8vector" v))
-     (unless (and (fixnum? k)
-                  (fx<= 0 k (fx1- (##u8vector-length v))))
-       (error "Bad index" v k))
-     (unless (and (fixnum? size)
-                  (fx<= 0 size (fx- (##u8vector-length v) k)))
-       (error "Bad integer size" v k size))))
-  ((_ v size)
-   (begin
-     (unless (u8vector? v)
-       (error "Expected u8vector" v))
-     (unless (and (fixnum? size)
-                  (fx> size 0)
-                  (fxzero? (fxremainder (##u8vector-length v) size)))
-       (error "Bad size" v size)))))
+  ((_ where v k size)
+   (@contract where
+              (u8vector? v)
+              (and (fixnum? k)
+                   (fx<= 0 k (fx1- (u8vector-length v))))
+              (and (fixnum? size)
+                   (fx<= 0 size (fx- (u8vector-length v) k)))))
+  ((_ where v size)
+   (@contract where
+              (u8vector? v)
+              (and (fixnum? size)
+                   (fx> size 0)
+                   (fxzero? (fxremainder (u8vector-length v) size))))))
 
 (defrules do-endianness ()
   ((_ endianness do-big do-little)
@@ -181,7 +177,7 @@
         (error "Bad endianness" endianness))))))
 
 (def (u8vector-s8-ref v i)
-  (check-int-ref v i 1)
+  (check-int-ref (u8vector-s8-ref v i) v i 1)
   (&u8vector-s8-ref v i))
 
 (def (&u8vector-s8-ref v i)
@@ -192,7 +188,7 @@
       u8)))
 
 (def (u8vector-s8-set! v i s8)
-  (check-int-ref v i 1)
+  (check-int-ref (u8vector-s8-set! v i s8) v i 1)
   (unless (fixnum? s8)
     (error "expected fixnum" s8))
   (&u8vector-s8-set! v i s8))
@@ -205,7 +201,7 @@
     (u8vector-set! v i u8)))
 
 (def (u8vector-uint-ref v k endianness size)
-  (check-int-ref v k size)
+  (check-int-ref (u8vector-uint-ref v k endianness size) v k size)
   (do-endianness endianness
      (&u8vector-uint-ref/be v k size)
      (&u8vector-uint-ref/le v k size)))
@@ -231,7 +227,7 @@
         r))))
 
 (def (u8vector-uint-set! v k uint endianness size)
-  (check-int-ref v k size)
+  (check-int-ref (u8vector-uint-set! v k uint endianness size) v k size)
   (do-endianness endianness
    (&u8vector-uint-set!/be v k uint size)
    (&u8vector-uint-set!/le v k uint size)))
@@ -255,7 +251,7 @@
           (lp (fx1+ i) (arithmetic-shift uint -8)))))))
 
 (def (u8vector-sint-ref v k endianness size)
-  (check-int-ref v k size)
+  (check-int-ref (u8vector-sint-ref v k endianness size) v k size)
   (do-endianness endianness
      (&u8vector-sint-ref/be v k size)
      (&u8vector-sint-ref/le v k size)))
@@ -274,7 +270,7 @@
   (do-sint-ref size (&u8vector-uint-ref/le v k size)))
 
 (def (u8vector-sint-set! v k sint endianness size)
-  (check-int-ref v k size)
+  (check-int-ref (u8vector-sint-set! v k sint endianness size) v k size)
   (do-endianness endianness
      (&u8vector-sint-set!/be v k sint size)
      (&u8vector-sint-set!/le v k sint size)))
@@ -293,13 +289,13 @@
   (do-sint-set! size sint uint (&u8vector-uint-set!/le v k uint size)))
 
 (def (u8vector->uint-list v endianness size)
-  (check-int-ref v size)
+  (check-int-ref (u8vector->uint-list v endianness size) v size)
   (do-endianness endianness
     (&u8vector->int-list v size &u8vector-uint-ref/be)
     (&u8vector->int-list v size &u8vector-uint-ref/le)))
 
 (def (u8vector->sint-list v endianness size)
-  (check-int-ref v size)
+  (check-int-ref (u8vector->sint-list v endianness size) v size)
   (do-endianness endianness
     (&u8vector->int-list v size &u8vector-sint-ref/be)
     (&u8vector->int-list v size &u8vector-sint-ref/le)))
@@ -363,25 +359,25 @@
                   (bv-native-set!   (format-id int "bytevector-~a-native-set!" int)))
       #'(begin
           (def (int-ref v k endianness)
-            (check-int-ref v k size)
+            (check-int-ref (int-ref v k endianness) v k size)
             (do-endianness endianness
               (&int-ref/be v k size)
               (&int-ref/le v k size)
               (&int-ref/native v k)))
           (defalias bv-ref int-ref)
           (def (int-set! v k n endianness)
-            (check-int-ref v k size)
+            (check-int-ref (int-set! v k n endianness) v k size)
             (do-endianness endianness
               (&int-set!/be v k n size)
               (&int-set!/le v k n size)
               (&int-set!/native v k n)))
           (defalias bv-set! int-set!)
           (def (int-native-ref v k)
-            (check-int-ref v k size)
+            (check-int-ref (int-native-ref v k) v k size)
             (&int-ref/native v k))
           (defalias bv-native-ref int-native-ref)
           (def (int-native-set! v k n)
-            (check-int-ref v k size)
+            (check-int-ref (int-native-set! v k n) v k size)
             (&int-set!/native v k n))
           (defalias bv-native-set! int-native-set!))))
 
@@ -435,35 +431,35 @@
        (&u8vector-reverse! v k size)))))
 
 (def (u8vector-float-ref v k endianness)
-  (check-int-ref v k 4)
+  (check-int-ref (u8vector-float-ref v k endianness) v k 4)
   (do-float-ref v k endianness 4 &u8vector-float-ref/native))
 
 (def (u8vector-float-set! v k x endianness)
-  (check-int-ref v k 4)
+  (check-int-ref (u8vector-float-set! v k x endianness) v k 4)
   (do-float-set! v k x endianness 4 &u8vector-float-set!/native))
 
 (def (u8vector-float-native-ref v k)
-  (check-int-ref v k 4)
+  (check-int-ref (u8vector-float-native-ref v k) v k 4)
   (&u8vector-float-ref/native v k))
 
 (def (u8vector-float-native-set! v k x)
-  (check-int-ref v k 4)
+  (check-int-ref (u8vector-float-native-set! v k x) v k 4)
   (&u8vector-float-set!/native v k x))
 
 (def (u8vector-double-ref v k endianness)
-  (check-int-ref v k 8)
+  (check-int-ref (u8vector-double-ref v k endianness) v k 8)
   (do-float-ref v k endianness 8 &u8vector-double-ref/native))
 
 (def (u8vector-double-set! v k x endianness)
-  (check-int-ref v k 8)
+  (check-int-ref (u8vector-double-set! v k x endianness) v k 8)
   (do-float-set! v k x endianness 8 &u8vector-double-set!/native))
 
 (def (u8vector-double-native-ref v k)
-  (check-int-ref v k 8)
+  (check-int-ref (u8vector-double-native-ref v k) v k 8)
   (&u8vector-double-ref/native v k))
 
 (def (u8vector-double-native-set! v k x)
-  (check-int-ref v k 8)
+  (check-int-ref (u8vector-double-native-set! v k x) v k 8)
   (&u8vector-double-set!/native v k x))
 
 ;;; Utilities
@@ -476,14 +472,10 @@
 (defalias bytevector->uint u8vector->uint)
 (defalias uint->bytevector uint->u8vector)
 
-(def (u8vector-swap! v j k)
-  (unless (u8vector? v)
-    (error "Expected u8vector" v))
-  (let (len-1 (fx1- (##u8vector-length v)))
-    (unless (fx<= 0 j len-1)
-      (error "Index out of range" v j))
-    (unless (fx<= 0 k len-1)
-      (error "Index out of range" v k)))
+(def/c (u8vector-swap! v j k)
+  (@contract (u8vector? v)
+             (fx<= 0 j (fx1- (u8vector-length v)))
+             (fx<= 0 k (fx1- (u8vector-length v))))
   (&u8vector-swap! v j k))
 
 (def (&u8vector-swap! v j k)
@@ -493,9 +485,8 @@
     (u8vector-set! v j k-val)
     (u8vector-set! v k j-val)))
 
-(def (u8vector-reverse! v)
-  (unless (u8vector? v)
-    (error "Expected u8vector" v))
+(def/c (u8vector-reverse! v)
+  (@contract (u8vector? v))
   (&u8vector-reverse! v 0 (u8vector-length v)))
 
 (def (&u8vector-reverse! v k size)
@@ -505,10 +496,9 @@
       ((<= right-index left-index))
     (&u8vector-swap! v left-index right-index)))
 
-(def (u8vector-reverse v)
+(def/c (u8vector-reverse v)
+  (@contract (u8vector? v))
   (declare (fixnum) (not safe))
-  (unless (u8vector? v)
-    (error "Expected u8vector" v))
   (let* ((len (u8vector-length v))
          (len-1 (1- len))
          (u (make-u8vector len)))
@@ -517,12 +507,10 @@
       (u8vector-set! u (- len-1 i) (u8vector-ref v i)))
     u))
 
-(def (u8vector->bytestring v (delim #\space))
+(def/c (u8vector->bytestring v (delim #\space))
+  (@contract (u8vector? v)
+             (or (not delim) (char? delim)))
   (declare (fixnum) (not safe))
-  (unless (u8vector? v)
-    (error "Expected u8vector" v))
-  (unless (or (not delim) (char? delim))
-    (error "Expected character or #f" delim))
   (let* ((len (u8vector-length v))
          (s (make-string (+ (* 2 len) (if delim (1- len) 0)))))
     (let lp ((i 0) (j 0))
@@ -555,9 +543,8 @@
           (else v))))
     (hex-decode bs)))
 
-(def (u8vector->uint v (endianness big))
-  (unless (u8vector? v)
-    (error "Expected u8vector" v))
+(def/c (u8vector->uint v (endianness big))
+  (@contract (u8vector? v))
   (do-endianness endianness
     (&u8vector->uint/be v)
     (&u8vector->uint/le v)))
@@ -582,9 +569,8 @@
                          (u8vector-ref v i)))
         r))))
 
-(def (uint->u8vector uint (endianness big))
-  (unless (and (exact-integer? uint) (>= uint 0))
-    (error "Non-negative exact integer expected" uint))
+(def/c (uint->u8vector uint (endianness big))
+  (@contract (and (exact-integer? uint) (>= uint 0)))
   (do-endianness endianness
     (&uint->u8vector/be uint)
     (&uint->u8vector/le uint)))

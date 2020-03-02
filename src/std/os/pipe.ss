@@ -3,14 +3,14 @@
 ;;; OS pipes
 
 (import :std/foreign
+        :std/contract
         :std/os/error
         :std/os/fd
         :std/os/fcntl)
 (export pipe)
 
-(def (pipe (direction 'inout) (closeonexec #t))
-  (unless (memq direction '(in out inout none))
-    (error "Invalid argument; direction must be one of in, out, inout, none"))
+(def/c (pipe (direction 'inout) (closeonexec #t))
+  (@contract (memq direction '(in out inout none)))
   (let* ((ptr (check-ptr (make_pipe_ptr)))
          (_ (check-os-error (_pipe ptr) (pipe)))
          (ifd (pipe_ptr_ref ptr 0))

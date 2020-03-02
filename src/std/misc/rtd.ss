@@ -2,6 +2,7 @@
 ;;; (C) vyzo at hackzen.org
 ;;; safe type descriptor accessors
 
+(import :std/contract)
 (export (rename: checked-object-type object-type)
         type? type-id type-name type-super
         type-descriptor?
@@ -20,27 +21,24 @@
   type-descriptor-slots
   type-descriptor-methods)
 
-(def (checked-object-type obj)
-  (if (object? obj)
-    (object-type obj)
-    (error "Not an object" obj)))
+(def/c (checked-object-type obj)
+  (@contract (object? obj))
+  (object-type obj))
 
 (def (type? obj)
   (##type? obj))
 
 (defrules defcheck-type ()
   ((_ id getf)
-   (def (id obj)
-     (if (##type? obj)
-       (getf obj)
-       (error "Bad argument; expected type object" obj)))))
+   (def/c (id obj)
+     (@contract (type? obj))
+     (getf obj))))
 
 (defrules defcheck-type-descriptor ()
   ((_ id getf)
-   (def (id obj)
-     (if (type-descriptor? obj)
-       (getf obj)
-       (error "Bad argument; expected type descriptor" obj)))))
+   (def/c (id obj)
+     (@contract (type-descriptor? obj))
+     (getf obj))))
 
 (defcheck-type type-id ##type-id)
 (defcheck-type type-name ##type-name)

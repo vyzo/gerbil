@@ -47,8 +47,9 @@
   ((comparator-testf c) o))
 
 (def (comparator-check-type c o)
-  (or (comparator-test-type c o)
-      (error "Invalid argument" c o)))
+  (begin-annotation @runtime-check
+    (or (comparator-test-type c o)
+        (error "Invalid argument" c o))))
 
 (def (comparator-hash c o)
   ((comparator-hash-function c) o))

@@ -8,6 +8,7 @@
         :gerbil/gambit/bits
         :std/srfi/13
         :std/error
+        :std/contract
         :std/sugar
         :std/logger
         :std/crypto/digest
@@ -135,13 +136,11 @@
       writer)
     ws))
 
-(def (websocket-send ws bytes type)
+(def/c (websocket-send ws bytes type)
+  (@contract (u8vector? bytes)
+             (or (eq? type 'binary)
+                 (eq? type 'text)))
   (cond
-   ((not (u8vector? bytes))
-    (error "Bad argument; expected u8vector" bytes))
-   ((not (or (eq? type 'binary)
-             (eq? type 'text)))
-    (error "Bad argument; expected 'binary or 'text" type))
    ((websocket-cs ws)
     => (lambda (how)
          (raise-io-error 'websocket-send "Websocket has been closed" ws how)))

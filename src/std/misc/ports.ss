@@ -3,7 +3,8 @@
 ;;; miscellaneous port utilities
 
 (import :gerbil/gambit/ports
-        :std/sugar)
+        :std/sugar
+        :std/contract)
 (export copy-port
         read-all-as-string
         read-file-string
@@ -36,12 +37,10 @@
 (bind-method! (macro-type-port) 'destroy close-port)
 
 ;; Copy all data from port in to port out
-(def (copy-port in out)
+(def/c (copy-port in out)
+  (@contract (input-port? in)
+             (output-port? out))
   (cond
-   ((not (input-port? in))
-    (error "Expected input port" in))
-   ((not (output-port? out))
-    (error "Expected output port" out))
    ((macro-byte-port? in)
     (cond
      ((macro-byte-port? out)

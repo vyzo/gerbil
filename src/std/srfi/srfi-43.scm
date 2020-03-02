@@ -165,7 +165,7 @@
 ;;;   that this happened while calling CALLEE.  Return VALUE if no
 ;;;   error was signalled.
 (define (check-type pred? value callee)
-  (if (pred? value)
+  #;(if (pred? value)
       value
       ;; Recur: when (or if) the user gets a debugger prompt, he can
       ;; proceed where the call to ERROR was with the correct value.
@@ -173,7 +173,11 @@
                   (error "erroneous value"
                          (list pred? value)
                          `(while calling ,callee))
-                  callee)))
+                  callee))
+  (begin-annotation @runtime-check
+    (unless (pred? value)
+      (error "erroneous value" callee value)))
+  value)
 
 ;;; (CHECK-INDEX <vector> <index> <callee>) -> index
 ;;;   Ensure that INDEX is a valid index into VECTOR; if not, signal an
@@ -181,7 +185,7 @@
 ;;;   CALLEE.  Return INDEX when it is valid.  (Note that this does NOT
 ;;;   check that VECTOR is indeed a vector.)
 (define (check-index vec index callee)
-  (let ((index (check-type integer? index callee)))
+  #;(let ((index (check-type integer? index callee)))
     (cond ((< index 0)
            (check-index vec
                         (error "vector index too low"
@@ -196,7 +200,11 @@
                                `(into vector ,vec)
                                `(while calling ,callee))
                         callee))
-          (else index))))
+          (else index)))
+  (begin-annotation @runtime-check
+    (unless (and (fixnum? index) (fx<= 0 index (fx1- (vector-length vec))))
+      (error "index out of range" callee vec index)))
+  index)
 
 ;;; (CHECK-INDICES <vector>
 ;;;                <start> <start-name>
@@ -209,7 +217,7 @@
 ;;;   while calling CALLEE.  Also ensure that VEC is in fact a vector.
 ;;;   Returns no useful value.
 (define (check-indices vec start start-name end end-name callee)
-  (let ((lose (lambda things
+  #;(let ((lose (lambda things
                 (apply error "vector range out of bounds"
                        (append things
                                `(vector was ,vec)
@@ -250,7 +258,11 @@
                           end-name
                           callee))
           (else
-           (values start end)))))
+           (values start end))))
+  (begin-annotation @runtime-check
+    (unless (and (fixnum? start) (fixnum? end) (fx<= 0 start end (vector-length vec)))
+      (error "bad end index" callee vec end)))
+  (values start end))
 
 
 
@@ -571,8 +583,9 @@
   (define (parse-args start end n fill)
     (let ((start (check-type nonneg-int? start vector-copy))
           (end   (check-type nonneg-int? end vector-copy)))
-      (cond ((and (<= 0 start end)
-                  (<= start n))
+      (cond ((begin-annotation @runtime-check
+               (and (<= 0 start end)
+                    (<= start n)))
              (values start end fill))
             (else
              (error "illegal arguments"
@@ -1127,8 +1140,9 @@
     (let ((tstart (check-type nonneg-int? tstart vector-copy!))
           (sstart (check-type nonneg-int? sstart vector-copy!))
           (send   (check-type nonneg-int? send vector-copy!)))
-      (cond ((and (<= 0 sstart send source-length)
-                  (<= (+ tstart (- send sstart)) (vector-length target)))
+      (cond ((begin-annotation @runtime-check
+               (and (<= 0 sstart send source-length)
+                    (<= (+ tstart (- send sstart)) (vector-length target))))
              (%vector-copy! target tstart source sstart send))
             (else
              (error "illegal arguments"
@@ -1169,8 +1183,9 @@
                       `(tstart was ,tstart)
                       `(sstart was ,sstart)
                       `(send   was ,send)))
-            ((and (<= 0 sstart send source-length)
-                  (<= (+ tstart (- send sstart)) (vector-length target)))
+            ((begin-annotation @runtime-check
+               (and (<= 0 sstart send source-length)
+                  (<= (+ tstart (- send sstart)) (vector-length target))))
              (%vector-reverse-copy! target tstart source sstart send))
             (else
              (error "illegal arguments"

@@ -5,7 +5,8 @@
 (import (only-in :gerbil/gambit/ports
                  with-output-to-string
                  with-output-to-u8vector write-u8)
-        :std/text/utf8)
+        :std/text/utf8
+        :std/contract)
 
 (export uri-encode uri-decode form-url-encode form-url-decode
         make-uri-encoding-table
@@ -40,9 +41,8 @@
   (make-uri-encoding-table uri-unreserved-chars '((#\space . #\+))))
 
 ;; uri-encode: string => string
-(def (uri-encode str (vt uri-encoding))
-  (unless (and (vector? vt) (##fx= (vector-length vt) 256))
-    (error "Bad encoding table" vt))
+(def/c (uri-encode str (vt uri-encoding))
+  (@contract (and(vector? vt) (fx= (vector-length vt) 256)))
   (with-output-to-string []
     (lambda ()
       (write-uri-encoded str vt))))
@@ -98,17 +98,15 @@
       (iota 16))
     ht))
 
-(def (uri-decode str (encoding #f))
+(def/c (uri-decode str (encoding #f))
+  (@contract (or (not encoding) (and (vector? encoding) (fx= (vector-length encoding) 256))))
+
   (def (hex-byte byte)
     (let (char (integer->char byte))
       (cond
        ((hash-get hex-bytes char) => values)
        (else
         (error "Malformed uri encoding" char)))))
-
-  (when encoding
-    (unless (and (vector? encoding) (##fx= (vector-length encoding) 256))
-      (error "Bad encoding table" encoding)))
 
   (let* ((utf8 (string->utf8 str))
          (len  (u8vector-length utf8))

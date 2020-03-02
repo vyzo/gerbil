@@ -6,6 +6,7 @@
         :gerbil/gambit/os
         :gerbil/gambit/exceptions
         :std/sugar
+        :std/contract
         :std/logger
         :std/net/bio
         :std/net/socket
@@ -44,29 +45,22 @@
 
 (def rpc-keep-alive 60) ; keep-alive interval
 
-(def (set-rpc-keep-alive-interval! dt)
-  (if (or (not dt) (and (real? dt) (positive? dt)))
-    (set! rpc-keep-alive dt)
-    (error "bad keep-alive; expected positive real or #f" dt)))
+(def/c (set-rpc-keep-alive-interval! dt)
+  (@contract (or (not dt) (and (real? dt) (positive? dt))))
+  (set! rpc-keep-alive dt))
 
 ;; TODO idle-timeout is ignored
 (def rpc-idle-timeout #f)
 
-(def (set-rpc-idle-timeout! dt)
-  (if (or (not dt) (and (real? dt) (positive? dt)))
-    (set! rpc-idle-timeout dt)
-    (error "bad idle interval; expected positive real or #f" dt)))
+(def/c (set-rpc-idle-timeout! dt)
+  (@contract (or (not dt) (and (real? dt) (positive? dt))))
+  (set! rpc-idle-timeout dt))
 
 (def rpc-call-timeout 60)
 
-(def (set-rpc-call-timeout! dt)
-  (cond
-   ((and (real? dt) (positive? dt) (finite? dt))
-    (set! rpc-call-timeout dt))
-   ((not dt)
-    (set! rpc-call-timeout #f))
-   (else
-    (error "bad timeout; expected finite positive real or #f" dt))))
+(def/c (set-rpc-call-timeout! dt)
+  (@contract (or (and (real? dt) (positive? dt) (finite? dt)) (not dt)))
+  (set! rpc-call-timeout dt))
 
 ;; connection state: message continuations
 (defstruct continuation-table

@@ -5,14 +5,14 @@
 (import :gerbil/gambit/fixnum
         :gerbil/gambit/bits
         :std/misc/bytes
-        :std/error)
+        :std/error
+        :std/contract)
 (export string->utf16 utf16->string)
 
 (declare (not safe))
 
-(def (string->utf16 str (endianness big) (BOM? #f))
-  (unless (string? str)
-    (error "Expected string" str))
+(def/c (string->utf16 str (endianness big) (BOM? #f))
+  (@contract (string? str))
   (let (u16-set!
         (case endianness
           ((big) u16-set!/be)
@@ -55,9 +55,8 @@
       bytes)
      (else bytes))))
 
-(def (utf16->string bytes (endianness big) (endianness-mandatory? #f))
-  (unless (u8vector? bytes)
-    (error "Expected u8vector" bytes))
+(def/c (utf16->string bytes (endianness big) (endianness-mandatory? #f))
+  (@contract (u8vector? bytes))
   (let (u16-ref
         (case endianness
           ((big) u16-ref/be)

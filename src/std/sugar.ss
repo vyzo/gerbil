@@ -145,11 +145,13 @@
 
 (defrules assert! ()
   ((_ expr)
-   (unless expr
-     (error "Assertion failed" 'expr)))
+   (begin-annotation @runtime-check
+     (unless expr
+       (error "Assertion failed" 'expr))))
   ((_ expr message)
-   (unless expr
-     (error "Assertion failed" message 'expr))))
+   (begin-annotation @runtime-check
+     (unless expr
+       (error "Assertion failed" message 'expr)))))
 
 (defrules while ()
   ((_ test body ...)

@@ -494,10 +494,10 @@
     ((:range cc var 0 arg2 1)
      (:do cc
           (let ((b arg2))
-            (if (not (and (integer? b) (exact? b)))
-                (error
-                   "arguments of :range are not exact integer "
-                   "(use :real-range?)" 0 b 1 )))
+            (begin-annotation @runtime-check
+              (if (not (and (integer? b) (exact? b)))
+                (error "arguments of :range are not exact integer "
+                  "(use :real-range?)" 0 b 1 ))))
           ((var 0))
           (< var b)
           (let ())
@@ -507,10 +507,10 @@
     ((:range cc var 0 arg2 -1)
      (:do cc
           (let ((b arg2))
-            (if (not (and (integer? b) (exact? b)))
-                (error
-                   "arguments of :range are not exact integer "
-                   "(use :real-range?)" 0 b 1 )))
+            (begin-annotation @runtime-check
+              (if (not (and (integer? b) (exact? b)))
+                (error "arguments of :range are not exact integer "
+                  "(use :real-range?)" 0 b 1 ))))
           ((var 0))
           (> var b)
           (let ())
@@ -520,11 +520,11 @@
     ((:range cc var arg1 arg2 1)
      (:do cc
           (let ((a arg1) (b arg2))
-            (if (not (and (integer? a) (exact? a)
-                          (integer? b) (exact? b) ))
-                (error
-                   "arguments of :range are not exact integer "
-                   "(use :real-range?)" a b 1 )) )
+            (begin-annotation @runtime-check
+              (if (not (and (integer? a) (exact? a)
+                            (integer? b) (exact? b) ))
+                (error "arguments of :range are not exact integer "
+                  "(use :real-range?)" a b 1 )) ))
           ((var a))
           (< var b)
           (let ())
@@ -534,11 +534,11 @@
     ((:range cc var arg1 arg2 -1)
      (:do cc
           (let ((a arg1) (b arg2) (s -1) (stop 0))
-            (if (not (and (integer? a) (exact? a)
-                          (integer? b) (exact? b) ))
-                (error
-                   "arguments of :range are not exact integer "
-                   "(use :real-range?)" a b -1 )) )
+            (begin-annotation @runtime-check
+              (if (not (and (integer? a) (exact? a)
+                            (integer? b) (exact? b) ))
+                (error "arguments of :range are not exact integer "
+                  "(use :real-range?)" a b -1 )) ))
           ((var a))
           (> var b)
           (let ())
@@ -550,14 +550,15 @@
     ((:range cc var arg1 arg2 arg3)
      (:do cc
           (let ((a arg1) (b arg2) (s arg3) (stop 0))
-            (if (not (and (integer? a) (exact? a)
-                          (integer? b) (exact? b)
-                          (integer? s) (exact? s) ))
-                (error
-                   "arguments of :range are not exact integer "
-                   "(use :real-range?)" a b s ))
-            (if (zero? s)
-                (error "step size must not be zero in :range") )
+            (begin-annotation @runtime-check
+              (begin
+                (if (not (and (integer? a) (exact? a)
+                              (integer? b) (exact? b)
+                              (integer? s) (exact? s) ))
+                  (error "arguments of :range are not exact integer "
+                    "(use :real-range?)" a b s ))
+                (if (zero? s)
+                  (error "step size must not be zero in :range") )))
             (set! stop (+ a (* (max 0 (ceiling (/ (- b a) s))) s))) )
           ((var a))
           (not (= var stop))
@@ -589,8 +590,9 @@
     ((:real-range cc var (index i) arg1 arg2 arg3)
      (:do cc
           (let ((a arg1) (b arg2) (s arg3) (istop 0))
-            (if (not (and (real? a) (real? b) (real? s)))
-                (error "arguments of :real-range are not real" a b s) )
+            (begin-annotation @runtime-check
+              (if (not (and (real? a) (real? b) (real? s)))
+                (error "arguments of :real-range are not real" a b s) ))
             (if (and (exact? a) (or (not (exact? b)) (not (exact? s))))
                 (set! a (exact->inexact a)) )
             (set! istop (/ (- b a) s)) )
@@ -658,10 +660,11 @@
                 (g #f)
                 (empty (list #f)) )
             (set! g (d args))
-            (if (not (procedure? g))
+            (begin-annotation @runtime-check
+              (if (not (procedure? g))
                 (error "unrecognized arguments in dispatching"
-                       args
-                       (d '()) )))
+                  args
+                  (d '()) ))))
           ((var (g empty)))
           (not (eq? var empty))
           (let ())
@@ -810,8 +813,9 @@
   :-dispatch )
 
 (define (:-dispatch-set! dispatch)
-  (if (not (procedure? dispatch))
-      (error "not a procedure" dispatch) )
+  (begin-annotation @runtime-check
+    (if (not (procedure? dispatch))
+      (error "not a procedure" dispatch) ))
   (set! :-dispatch dispatch) )
 
 (define-syntax :

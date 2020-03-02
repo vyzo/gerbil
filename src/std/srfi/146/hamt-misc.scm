@@ -25,13 +25,15 @@
 (define-syntax assert
   (syntax-rules ()
     ((_ (operator argument ...))
-     (unless (operator argument ...)
-       (error "Assertion failed:"
-	      '(operator argument ...)
-	      (list 'operator argument ...))))
+     (begin-annotation @runtime-check
+       (unless (operator argument ...)
+         (error "Assertion failed:"
+	       '(operator argument ...)
+	       (list 'operator argument ...)))))
     ((_ expression)
-     (unless expression
-       (error "Assertion failed:" 'expression)))))
+     (begin-annotation @runtime-check
+       (unless expression
+         (error "Assertion failed:" 'expression))))))
 
 (define-syntax do-list
   (syntax-rules ()

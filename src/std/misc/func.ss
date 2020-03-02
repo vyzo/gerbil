@@ -3,6 +3,7 @@
 ;;; © vyzo
 ;;; Utility procedures
 
+(import :std/contract)
 (export
   repeat always
   compose1 compose compose/values
@@ -13,10 +14,9 @@
 ;; Repeat value or call function N times and return the result as list.
 ;; (repeat 2 5)                  -> (2 2 2 2 2)  ; repeat the value 2
 ;; (repeat random-interger 3 10) -> (8 3 5)      ; repeated function call with passed argument
-(def (repeat v-or-fn n-times . args)
+(def/c (repeat v-or-fn n-times . args)
+  (@contract (fixnum? n-times))
   (declare (fixnum) (not safe))
-  (unless (fixnum? n-times)
-    (error "Bad argument; expected fixnum" n-times))
   (if (procedure? v-or-fn)
     (let ((fn (if (null? args)
 		        v-or-fn
