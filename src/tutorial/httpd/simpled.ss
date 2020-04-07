@@ -4,6 +4,12 @@
 (import :std/net/httpd
         :std/net/address
         :std/text/json
+        :std/misc/text
+        ;; imports for templates
+        (for-syntax :std/misc/text
+                    :std/xml
+                    :std/iter
+                    :gerbil/gambit/os)
         :std/sugar
         :std/iter
         :std/getopt
@@ -16,6 +22,7 @@
     (http-register-handler httpd "/echo" echo-handler)
     (http-register-handler httpd "/headers" headers-handler)
     (http-register-handler httpd "/self" self-handler)
+    (http-register-handler httpd "/template" template-handler)
     (thread-join! httpd)))
 
 ;; /
@@ -58,6 +65,22 @@
 ;; own program representation
 (def (self-handler req res)
   (http-response-file res '(("Content-Type" . "text/plain")) "simpled.ss"))
+
+;; /template
+(def (template-handler req res)
+  (def (json-ref key)
+    (let* ((json (read-json (open-input-u8vector (http-request-body req))))
+           (ref (hash-ref json key)))
+      (if ref
+        ref
+        (string-append "Key " key " not found."))))
+
+  ;; title and h1 are run-time template variables
+  (def (t title h1)
+    (include-quasistring* "templates/template.html"))
+
+  (http-response-write res 200 '(("Content-Type" . "text/html"))
+    (t "Title" "Hey!")))
 
 ;; default
 (def (default-handler req res)

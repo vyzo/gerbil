@@ -22,6 +22,7 @@
         "misc/barrier-test"
         "misc/completion-test"
         "misc/bytes-test"
+        "misc/text-test"
         "text/csv-test"
         "text/json-test"
         "text/utf8-test"
@@ -78,6 +79,7 @@
    barrier-test
    completion-test
    bytes-test
+   text-test
    actor-xdr-test
    actor-rpc-test
    actor-rpc-stream-test

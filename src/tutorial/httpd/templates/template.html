@@ -1,0 +1,13 @@
+<html>
+    <head>
+        <title>#{title}</title>
+    </head>
+    <body>
+        <h1>#{h1}</h1>
+
+        <!-- sub-template -->
+        ##{(include-text "templates/subtemplate.html")}
+
+        <h3>Your message is: #{(json-ref 'message)}</h3>
+    </body>
+</html>
