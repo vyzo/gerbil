@@ -1,0 +1,801 @@
+#+TITLE: Gerbil in .deb packages
+
+Gerbil. I use it for production servers. With VM's, often, Ubuntu is the way. A
+package is the way to go, with an apt repository so it's automagically
+distributed. Thus, here we go.
+
+This file is tangled to produce some files. 
+
+* Usage 
+
+This is the entire point, and everything that follows, in fact, leads to this
+point.
+
+This is a brand new Google Cloud box, running ~Ubuntu 16.0.4 LTS minimal~.
+
+#+begin_src shell
+DREWC_APT_REPO="https://raw.githubusercontent.com/drewc/apt-repo/master"
+DREWC_SOURCES="/etc/apt/sources.list.d/drewc-apt-repo.list"
+
+# Make the sources.list.d
+
+echo "deb $DREWC_APT_REPO xenial main" | sudo tee $DREWC_SOURCES
+echo "deb-src $DREWC_APT_REPO xenial main" | sudo tee -a $DREWC_SOURCES
+
+# Add the GPG public key 
+curl $DREWC_APT_REPO/gpg.key | sudo apt-key add -
+
+sudo apt-get install apt-transport-https
+
+# And Update
+sudo apt-get update
+#+end_src
+
+This is what we've been waiting for!
+
+#+begin_src shell
+sudo apt-get install gerbil # or gerbil-snapshot
+#+end_src
+
+To test, we'll attempt to install swank.
+
+#+begin_src shell
+sudo apt-get install git build-essential
+gxpkg install github.com/ecraven/r7rs-swank
+
+gxi -e "(import :ecraven/gerbil-swank)" -e "(start-swank)"
+# swank listening on port 4005
+#+end_src
+
+Now to test it fully, we need emacs and slime. When it is [[#emacs_and_slime][setup]], run:
+
+ ~M-x slime-connect <RET> <RET>~
+
+... and we're done!
+
+* Make Package ${binary:Version}
+  :PROPERTIES:
+  :CUSTOM_ID: make_package
+  :END:
+
+I've been running debian for about 25 years, yet this is only my second package
+in the last 2 decades or so. As luck would have it, they (like everything these days)
+are git repos. Building Debian Packages with [[http://honk.sigxcpu.org/projects/git-buildpackage/manual-html/gbp.html][git-buildpackage]] to the rescue.
+
+Debian also has an intro: https://wiki.debian.org/PackagingWithGit.
+
+#+BEGIN_SRC shell
+sudo apt-get update && sudo apt-get install git-buildpackage debhelper texinfo dh-make
+
+mkdir -p ~/src/apt 
+
+cd ~/src/apt && wget http://launchpadlibrarian.net/404114436/git-buildpackage_0.9.13_all.deb
+sudo dpkg -i git-buildpackage_0.9.13_all.deb 
+sudo apt-get install -f
+sudo dpkg -i git-buildpackage_0.9.13_all.deb 
+
+#+END_SRC
+
+
+Use the PPA to make ~gambc~ (Gambit) available.
+
+#+BEGIN_SRC shell
+sudo add-apt-repository ppa:drewc/gerbil
+sudo apt-get update
+#+END_SRC
+
+http://honk.sigxcpu.org/projects/git-buildpackage/manual-html/gbp.import.upstream-git.html
+
+
+*HACK*. Before building, if running on a small AppVM in Qubes (or whatever tiny VM), add some swap.
+
+#+BEGIN_SRC shell
+sudo fallocate -l 4G ~/swapfile
+sudo chmod 600 ~/swapfile
+sudo mkswap ~/swapfile
+swapon ~/swapfile
+#+END_SRC
+
+
+#+BEGIN_SRC shell
+_DEB_BRANCH=debian
+_GERBIL_VERSION=v0.15.1
+_NEW_GERBIL_VERSION=v0.15.2
+cd ~/src/apt && git clone --no-checkout -o upstream git@github.com:drewc/gerbil.git
+cd ~/src/apt/gerbil && git checkout -b $_DEB_BRANCH $_GERBIL_VERSION\
+cd ~/src/apt/gerbil && mkdir debian
+cd ~/src/apt/gerbil && mkdir debian/source
+
+# Tangle all the files from README.debian.org
+
+# GERBIL_HOME 
+cd ~/src/apt/gerbil && git apply gx-init-exe.diff
+git add -u && git commit -m "Make GERBIL_HOME detection better"
+
+# ./configure && make && make install
+
+cd ~/src/apt/gerbil/ && autoconf
+cd ~/src/apt/gerbil/ && git add Makefile.in configure configure.ac 
+cd ~/src/apt/gerbil/ && git commit -m "Import ./configure  which makes Makefile"
+
+# Add a tag for our new "version" 
+cd ~/src/apt/gerbil/ && git tag v0.15.2
+
+
+# Import the ./debian
+cd ~/src/apt/gerbil/ && git add debian/*
+cd ~/src/apt/gerbil/ && git commit -m "Import debian/"
+
+# remove leftovers 
+
+cd ~/src/apt/gerbil && rm -rf  ../gerbil-build-area ; rm -rf autom4te.cache/
+
+
+cd ~/src/apt/gerbil && mkdir ../gerbil-build-area
+
+sudo apt-get install -y libssl-dev gambc zlib1g-dev libyaml-dev libxml2-dev libmysqlclient-dev libmysqlclient-dev
+
+cd ~/src/apt/gerbil/ && gbp buildpackage --git-ignore-new \
+                            --git-export-dir=../gerbil-build-area --git-pristine-tar \
+                            --git-pristine-tar-commit --git-upstream-tag='v%(version)s' --git-debian-branch=$_DEB_BRANCH
+
+#+END_SRC
+
+*HACK*, just a few things
+
+#+BEGIN_SRC shell
+git config --global user.email me@drewc.ca
+git config --global user.name "Drew Crampsie"
+git stash ; git checkout master ; git branch -D debian ; git branch -D pristine-tar ; git tag -d v0.15.2 ;
+
+# Build the imported git branch thingie
+
+mkdir -p ~/src/apt
+
+cd ~/src/apt && git clone --no-checkout -o upstream git@github.com:drewc/gerbil.git
+cd ~/src/apt/gerbil && git checkout -b xenial
+
+
+#+END_SRC
+
+* ~gerbil-snapshot~: Obey your master (branch).
+
+Gerbil is always under development, and new things get added all the time.
+~gerbil-snapshot~ seems like a good approach. 
+
+First things first, update the source repo.
+
+#+begin_src shell
+_DEB_BRANCH=debian
+cd ~/src/apt && git clone --no-checkout -o upstream git@github.com:drewc/gerbil.git
+cd ~/src/apt/gerbil && git remote add vyzo git@github.com:vyzo/gerbil.git \
+ && git checkout master && git pull vyzo master && git push upstream master
+ 
+cd ~/src/apt/gerbil && git checkout $_DEB_BRANCH && git pull vyzo master
+
+# Tag our version. Configure.sh uses this.
+
+cd ~/src/apt/gerbil && git tag v0.16.0-1snapshot-DEV-20-cd16549
+
+# Now tangle configure.org, and run configure.sh
+
+tangle() {
+    emacs --batch -l org --eval "(org-babel-tangle-file \"$1\")"
+}
+
+cd ~/src/apt/gerbil && tangle configure.org && ./configure.sh
+
+# commit the new config
+
+cd ~/src/apt/gerbil/ && git add Makefile.in configure configure.ac configure.sh configure.org
+cd ~/src/apt/gerbil/ && git commit -m "add configure.org and configure.sh"
+
+# DONE: Move the README.debian.org
+
+# cd ~/src/apt/gerbil && git rm -f README.debian.org && git add debian/README.debian.org 
+# cd ~/src/apt/gerbil && git commit -m "Move README.debian.org into debian/"
+
+# tangle the new README.debian.org
+
+cd ~/src/apt/gerbil/debian && tangle README.debian.org
+
+# This is still new
+git add src/gerbil/gxi 
+git commit -m "A more POSIX friendly way of finding GERBIL_HOME"
+
+# Cleaning up
+cd ~/src/apt/gerbil && rm -rf  ../gerbil-build-area ; rm -rf autom4te.cache/ ; rm gx-init-exe.diff 
+#+end_src
+
+
+Now that we have that, we can try a snapshot build. This create a new entry for debian/changelog
+
+#+begin_src shell
+gbp dch --snapshot --debian-branch=debian --new-version=0.16.0-1snapshot-DEV-20-cd16549
+
+# make it me, so signing works
+
+sed -r -i 's/-- vyzo <user@localhost>/-- Drew Crampsie <me@drewc.ca>/' debian/changelog 
+
+# Add the ./debian
+cd ~/src/apt/gerbil/ && git add debian/*
+cd ~/src/apt/gerbil/ && git commit -m "Make a gerbil-snapshot for debian/"
+
+#+end_src
+
+
+So, let's try and build! The build process requires the .git for version tags.
+
+#+begin_src shell
+cd ~/src/apt/gerbil/ && gbp buildpackage  --git-ignore-new \
+  --git-export-dir=../gerbil-build-area --git-upstream-tree=SLOPPY --git-force-create \
+  --git-pristine-tar-commit --git-debian-branch=debian
+
+#+end_src
+
+When that finally builds, we can change the name of the release in the changelog.
+
+#+begin_src shell
+gbp dch --release
+#+end_src
+
+Edit the changelog to make sure. Then commit the new changelog.
+
+#+begin_src shell
+git add debian/changlog && git commit -m "Make a proper release changlog"
+#+end_src
+
+Build a source package.
+
+
+#+BEGIN_SRC shell 
+cd ~/src/apt/gerbil && ln ../gerbil-build-area/*.orig.tar.gz ../ ; debuild -S -sa
+#+END_SRC
+
+It works! Add it to the apt repository.
+
+#+begin_src shell 
+cd ~/src/apt && reprepro -b ~/src/apt-repo include xenial \
+   gerbil-snapshot_0.16.0-1snapshot-DEV-20-g8c99110ubuntu1_source.changes
+
+cd ~/src/apt-repo && git add -A \
+  && git commit -m "Add gerbil-snapshot_0.16.0-1snapshot-DEV-20-g8c99110ubuntu1 source package" && git push
+#+end_src
+ 
+Now build the binary [[#build_on_other_box][on another box]]. 
+
+#+begin_src shell
+# after adding the sources.list and updating
+
+apt-get source gerbil-snapshot
+sudo apt-get build-dep --yes gerbil-snapshot
+scp -r /home/user/.ssh /home/user/.gnupg user@34.83.85.242:/home/user
+cd gerbil-snapshot-0.16.0-1snapshot-DEV-20/
+debuild -b
+#+end_src
+** Reprepro 
+
+
+#+begin_src shell
+# Before or During build 
+
+mkdir ~/src/ ; cd ~/src/ && git clone git@github.com:drewc/apt-repo.git && cd - 
+
+git config --global user.email me@drewc.ca
+git config --global user.name "Drew Crampsie"
+
+cd /tmp/
+wget https://launchpadlibrarian.net/409523835/reprepro_5.3.0-1_amd64.deb
+sudo dpkg -i reprepro_5.3.0-1_amd64.deb
+sudo apt-get install -fy
+cd -
+#+end_src
+#+begin_src shell
+# After Build
+
+cd ../ 
+reprepro -b ~/src/apt-repo include xenial \
+  gerbil-snapshot_0.16.0-1snapshot-DEV-20-g8c99110ubuntu1_amd64.changes 
+cd ~/src/apt-repo && git add -A && \
+  git commit -m "Add gerbil-snapshot for 0.16.0-1snapshot-DEV-20 built under xenial" && git push
+
+#+end_src
+
+* The debian/ directory
+  
+  The debian/ directory is where all of debian's package development tools look
+  for files. This part is tangled in order to produce the new debian.
+
+** control
+
+   This file contains various values which dpkg, dselect, apt-get, apt-cache,
+   aptitude, and other package management tools will use to manage the package. It
+   is defined by the Debian Policy Manual, 5 "Control files and their fields". 
+   --[[https://www.debian.org/doc/manuals/maint-guide/dreq.en.html][Debian New Maintainers' Guide]]
+
+
+   #+BEGIN_SRC conf :tangle "./control"
+Source: gerbil-snapshot
+Section: devel
+Priority: optional
+Maintainer: Drew Crampsie <me@drewc.ca> 
+Build-Depends: debhelper, texinfo, libssl-dev, gambc, zlib1g-dev, libsqlite3-dev, libyaml-dev, libxml2-dev, libleveldb-dev, libmysqlclient-dev, liblmdb-dev
+Standards-Version: 4.0.1
+Homepage: https://github.com/vyzo/gerbil
+
+Package: gerbil-snapshot
+Architecture: any
+Depends: gambc (>= 4.9.0)
+Description: Gerbil is an opinionated dialect of Scheme designed for Systems
+ Programming, with a state of the art macro and module system on top of the
+ Gambit runtime.
+ .
+ The macro system is based on quote-syntax, and provides the full meta-syntactic
+ tower with a native implementation of syntax-case. It also provides a
+ full-blown module system, similar to PLT Scheme (sorry, Racket) modules. The
+ main difference from Racket is that Gerbil modules are single instantiation,
+ supporting high performance ahead of time compilation and compiled macros.
+   #+END_SRC
+** copyright
+   :PROPERTIES:
+   :CUSTOM_ID: debian_copyright
+   :END:
+
+
+   #+BEGIN_SRC text :tangle "./copyright"
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Gerbil
+Upstream-Contact: Dimitris Vyzovitis <vyzo -at- hackzen.org>
+Source: https://github.com/vyzo/gerbil
+
+Files: *
+Copyright: 2007-2018, Dimitris Vyzovitis <vyzo -at- hackzen.org>
+License: Apache-2.0 or LGPL-2.1
+
+License: Apache-2.0
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+.
+http://www.apache.org/licenses/LICENSE-2.0
+.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+.
+On Debian systems, the complete text of the Apache License 2.0 can
+be found in "/usr/share/common-licenses/Apache-2.0"
+
+License: LGPL-2.1
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; version
+2.1 of the License.
+.
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+.
+You should have received a copy of the GNU Lesser General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>
+.
+On Debian systems, the complete text of the GNU Lesser General
+Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
+
+Files: debian/*
+Copyright: 2019, Drew Crampsie <me@drewc.ca>
+License: Unlicence 
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
+software, either in source code form or as a compiled binary, for any purpose,
+commercial or non-commercial, and by any means.
+
+In jurisdictions that recognize copyright laws, the author or authors
+of this software dedicate any and all copyright interest in the
+software to the public domain. We make this dedication for the benefit
+of the public at large and to the detriment of our heirs and
+successors. We intend this dedication to be an overt act of
+relinquishment in perpetuity of all present and future rights to this
+software under copyright law.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+For more information, please refer to <http://unlicense.org/>
+
+Files: README.debian.org
+Copyright: 2019, Drew Crampsie <me@drewc.ca>
+License: Unlicence
+
+
+   #+END_SRC
+** compat 
+   #+BEGIN_SRC text :tangle "./compat"
+10
+   #+END_SRC
+** changelog
+
+We've got two. gerbil and gerbil-snapshot. They are usually generated
+automagically.
+ 
+** rules 
+
+   #+BEGIN_SRC makefile-gmake :shebang "#!/usr/bin/make -f" :tangle "./rules"
+
+# Verbosity
+#export DH_VERBOSE = 1
+
+# Build Flags
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/buildflags.mk
+
+%:
+	dh $@
+
+# Enable all the optional libs
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		--enable-libyaml \
+		--enable-libxml \
+		--enable-zlib \
+		--enable-sqlite \
+		--enable-mysql \
+		--enable-lmdb \
+		--enable-leveldb
+ 
+   #+END_SRC
+** source/format
+
+   In the debian/source/format file, there should be a single line indicating the
+   desired format for the source package (check dpkg-source(1) for an exhaustive
+   list).
+
+   #+BEGIN_SRC text :tangle "./source/format"
+3.0 (quilt)
+   #+END_SRC
+
+
+* ~$GERBIL_HOME~ and gxi 
+
+Currently, a lot of gerbil's tools require an environment for interactive and/or
+runtime use. ~$GERBIL_HOME~ is the big one. 
+
+So, if we have ~gxi~ know where the gerbil lives, we can use that script elsewhere.
+
+** Find Gerbil's den. 
+
+ It could be a symlink, our ~gsi~ command. We could be calling it from anywhere.
+ Since we're on GNU/Linux, ~readlink~ works.
+
+
+#+begin_quote
+ -f, --canonicalize 
+
+   canonicalize by following every symlink in every component of the given name
+   recursively; all but the last component must exist
+
+#+end_quote
+
+#+NAME: export-GERBIL_HOME
+#+begin_src shell
+
+if [ -z "${GERBIL_HOME:-}" ]; then
+
+    # First, try whereis. We are looking for $GERBIL_HOME/lib/std, our stdlib
+    for gh in $(whereis -b gerbil |cut -d: -f2); do
+        if [ -d $gh/lib/std ]; then
+            GERBIL_HOME="$gh" ; break ;
+        fi;
+    done
+
+    # if that did not work, find out where we are and try that.
+    if [ -z "${GERBIL_HOME:-}" ]; then
+        GERBIL_BIN_LOCATION="$0"
+
+        # Check if we're a symlink
+        GERBIL_LINK=$(readlink $GERBIL_BIN_LOCATION || true)
+        while true
+        do
+            # If not, "../" is our home
+            if [ -z "$GERBIL_LINK" ]; then
+                GERBIL_HOME=$(dirname $(cd ${GERBIL_BIN_LOCATION%/*} && echo $PWD))
+                break;
+            else
+                # if we're a link, go down the chain.
+                GERBIL_BIN_LOCATION=$GERBIL_LINK
+                GERBIL_LINK=$(readlink "$GERBIL_LINK" || true);
+            fi
+        done
+    fi
+    export GERBIL_HOME
+fi
+
+#+end_src
+
+** ~gxi --home~
+
+At times, we want to find our home inside other dens, or simply to see where we
+are stored. Not all of gerbil is shell scripts. To make it simple, we do not put
+a newline.
+
+#+NAME: gxi--home
+#+begin_src shell
+if [ $# -gt 0 ]; then
+    case $1 in
+        --home)
+            echo -n $GERBIL_HOME;
+            exit 0;
+            ;;
+    esac
+fi
+#+end_src
+
+** The ~gxi~ script
+
+Beyond finding and using ~GERBIL_HOME~, the script does other things, like
+launch our interactive repl.
+
+#+begin_src shell :tangle "../src/gerbil/gxi" :shebang #!/bin/sh :noweb yes
+set -eu
+
+<<export-GERBIL_HOME>>
+
+<<gxi--home>>
+
+if [ $# -gt 0 ]; then
+    case $1 in
+        -:*)
+            GSIOPTIONS=$1
+            shift
+            ;;
+    esac
+fi
+
+if [ $# -gt 0 ]; then
+    case $1 in
+        --lang)
+            export GERBIL_LANG=$2
+            shift 2
+            ;;
+    esac
+fi
+
+if [ $# -eq 0 ]; then
+    exec gsi ${GSIOPTIONS:-} $GERBIL_HOME/lib/gxi-init $GERBIL_HOME/lib/gxi-interactive -
+else
+    exec gsi ${GSIOPTIONS:-} $GERBIL_HOME/lib/gxi-init "$@"
+fi
+
+#+end_src
+
+** ~(gxi_GERBIL_HOME)~, for ~gx-init-exe.scm~
+
+ In ~_gx#load-runtime!~, there is an error if it cannot find where home is. We'll fix that.
+
+#+begin_src gerbil
+(define (gxi_GERBIL_HOME)
+  (let* ((result.string (shell-command "gxi --home" #t))
+         (result (car result.string))
+         (home (cdr result.string)))
+    (if (zero? result)
+      home
+      #f)))
+#+end_src
+
+Going to make it a .diff that we can apply.
+
+#+begin_src diff :tangle gx-init-exe.diff
+
+#+diff --git a/src/gerbil/boot/gx-init-exe.scm b/src/gerbil/boot/gx-init-exe.scm
+index 7e23c34..3a141b5 100644
+--- a/src/gerbil/boot/gx-init-exe.scm
++++ b/src/gerbil/boot/gx-init-exe.scm
+@@ -17,10 +17,19 @@
+ (define __gx#method-ref #f)
+ 
+ (define (_gx#load-runtime!)
++  (define (gxi_GERBIL_HOME)
++    (let* ((result.string (shell-command "gxi --home" #t))
++           (result (car result.string))
++           (home (cdr result.string)))
++      (if (zero? result)
++        home
++        #f)))
++
+   (let* ((home
+           (path-normalize
+            (cond
+             ((getenv "GERBIL_HOME" #f) => values)
++            ((gxi_GERBIL_HOME) => values)
+             (else
+              (error "Cannot determine GERBIL_HOME")))))
+          (libdir
+#+end_src
+
+* The Github Apt Repository
+
+* Archive: reprepro 
+
+We've [[#starting_point][built a debian package]], and marked it for Xenial. We have an apt
+repository git repository. Errr... [[https://blog.packagecloud.io/eng/2017/03/23/create-debian-repository-reprepro/][reprepro]].
+
+** ~xenial~
+
+#+BEGIN_SRC shell
+lsb_release -cs # xenial
+#+END_SRC
+
+#+BEGIN_SRC shell
+cd ~/src/apt/gerbil/ && git checkout debian
+#+END_SRC
+
+
+
+#+BEGIN_SRC shell 
+cd ~/src/apt/gerbil && ln ../gerbil-build-area/*.orig.tar.gz ../ ; debuild -S -sa
+#+END_SRC
+
+Now we have a source.changes and other mumbo-jumbo. Time to add it to our apt repo
+
+#+begin_src shell
+mkdir ~/src/ ; cd ~/src/ && git clone git@github.com:drewc/apt-repo.git
+#+end_src
+
+#+begin_src shell 
+cd ~/src/apt && reprepro -b ~/src/apt-repo include xenial gerbil_0.15.2-1ppa2_source.changes
+cd ~/src/apt-repo && git add -A \
+  && git commit -m "Add gerbil_0.15.2-1ppa2 source package" && git push
+#+end_src
+*** Build the binary .deb
+    :PROPERTIES:
+    :CUSTOM_ID: build_on_other_box
+    :END:
+
+On a brand new box, we'll try to build and install the new package.
+
+
+Make sure the Apt repo is already added.
+
+#+begin_src shell
+DREWC_APT_REPO="https://raw.githubusercontent.com/drewc/apt-repo/master"
+DREWC_SOURCES="/etc/apt/sources.list.d/drewc-apt-repo.list"
+
+# Make the sources.list.d
+
+echo "deb $DREWC_APT_REPO xenial main" | sudo tee $DREWC_SOURCES
+echo "deb-src $DREWC_APT_REPO xenial main" | sudo tee -a $DREWC_SOURCES
+
+# Add the GPG public key 
+curl $DREWC_APT_REPO/gpg.key | sudo apt-key add -
+
+# And Update
+sudo apt-get update
+#+end_src
+
+Let's get the source, and the build dependencies.
+
+#+begin_src shell
+cd `mktemp -d`; mkdir source; cd source;
+
+sudo apt-get install --yes build-essential fakeroot dpkg-dev devscripts
+
+apt-get source gerbil
+sudo apt-get build-dep --yes gerbil
+#+end_src
+
+From our end, to this box, we need ssh and gnupg keys.
+
+#+begin_src shell
+scp -r /home/user/.ssh /home/user/.gnupg user@34.83.221.153:/home/user
+#+end_src
+
+Now build the package.
+#+begin_src shell
+cd gerbil-0.15.2/ && debuild -b
+
+#+end_src
+
+
+While it's building, we'll checkout the apt-repo.
+
+#+begin_src shell
+mkdir ~/src/ ; cd ~/src/ && git clone git@github.com:drewc/apt-repo.git && cd - 
+
+git config --global user.email me@drewc.ca
+git config --global user.name "Drew Crampsie"
+
+#+END_SRC
+
+Now that it successfully built, we install reprepro.
+
+#+begin_src shell
+cd /tmp/
+wget https://launchpadlibrarian.net/409523835/reprepro_5.3.0-1_amd64.deb
+sudo dpkg -i reprepro_5.3.0-1_amd64.deb
+sudo apt-get install -fy
+cd -
+#+end_src
+
+Use it to add the new binary under xenial. 
+
+#+begin_src shell
+ cd ../ && reprepro -b ~/src/apt-repo include xenial gerbil_0.15.2-1ppa2_amd64.changes
+#+end_src
+
+And finally, commit it as part of the Github Apt Repository!
+
+#+begin_src shell
+cd ~/src/apt-repo && git add -A && git commit -m "Add gerbil built under xenial" && git push
+#+end_src
+
+* Emacs and SLIME
+  :PROPERTIES:
+  :CUSTOM_ID: emacs_and_slime
+  :END:
+
+
+We want to try slime on random boxes. This is how we do it.
+
+#+begin_src shell
+sudo apt-get install emacs 
+#+end_src
+
+Evaluate this in emacs.
+
+#+begin_src emacs-lisp
+(require 'package)
+(let* ((no-ssl (and (memq system-type '(windows-nt ms-dos))
+                    (not (gnutls-available-p))))
+       (proto (if no-ssl "http" "https")))
+  (when no-ssl
+    (warn "\
+Your version of Emacs does not support SSL connections,
+which is unsafe because it allows man-in-the-middle attacks.
+There are two things you can do about this warning:
+1. Install an Emacs version that does support SSL and be safe.
+2. Remove this warning from your init file so you won't see it again."))
+  ;; Comment/uncomment these two lines to enable/disable MELPA and MELPA Stable as desired
+  (add-to-list 'package-archives (cons "melpa" (concat proto "://melpa.org/packages/")) t)
+  ;;(add-to-list 'package-archives (cons "melpa-stable" (concat proto "://stable.melpa.org/packages/")) t)
+  (when (< emacs-major-version 24)
+    ;; For important compatibility libraries like cl-lib
+    (add-to-list 'package-archives (cons "gnu" (concat proto "://elpa.gnu.org/packages/")))))
+(package-initialize)
+#+end_src
+
+Then, ~M-x package-refresh-contents~ and ~M-x package-install <RET> slime~.
+
+Finally:
+
+#+begin_src emacs-lisp
+(setq slime-contribs '(slime-fancy))
+#+end_src
+
+... and slime is setup.
+
+* Legalese
+  :PROPERTIES:
+  :COPYING: t
+  :END:
+
+  Copyright © Drew Crampsie <me@drewc.ca>, All Right Reserved.
+
+  Code is licensed according to where it is tangled and what [[#debian_copyright][debian/copyright]]
+  has to say.
+
+
+# Local Variables:
+# org-src-tab-acts-natively: t
+# org-src-preserve-indentation: t
+# End:

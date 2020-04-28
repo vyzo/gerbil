@@ -1,0 +1,20 @@
+Source: gerbil-snapshot
+Section: devel
+Priority: optional
+Maintainer: Drew Crampsie <me@drewc.ca> 
+Build-Depends: debhelper, texinfo, libssl-dev, gambc, zlib1g-dev, libsqlite3-dev, libyaml-dev, libxml2-dev, libleveldb-dev, libmysqlclient-dev, liblmdb-dev
+Standards-Version: 4.0.1
+Homepage: https://github.com/vyzo/gerbil
+
+Package: gerbil-snapshot
+Architecture: any
+Depends: gambc (>= 4.9.0)
+Description: Gerbil is an opinionated dialect of Scheme designed for Systems
+ Programming, with a state of the art macro and module system on top of the
+ Gambit runtime.
+ .
+ The macro system is based on quote-syntax, and provides the full meta-syntactic
+ tower with a native implementation of syntax-case. It also provides a
+ full-blown module system, similar to PLT Scheme (sorry, Racket) modules. The
+ main difference from Racket is that Gerbil modules are single instantiation,
+ supporting high performance ahead of time compilation and compiled macros.

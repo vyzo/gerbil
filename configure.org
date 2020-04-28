@@ -1,0 +1,364 @@
+#+TITLE: ./configure && make && make install
+
+Make. ~gerbil~ needs ~./configure; make; make install~ that folks use. It
+seems that ~debuild~ and the like really enjoy that sort of thing. So here we
+go.
+
+* ./configure
+  :PROPERTIES:
+  :CUSTOM_ID: configure
+  :END:
+
+In the end there are generations of scripts that we need to give birth to. Once
+that is done, we generate a ./configure which generates a Makefile.
+
+#+begin_src shell
+./configure.sh
+# [ ... ]
+
+# Tangled 5 code blocks from configure.org
+# Replacing PACKAGE_VERSION and PACKAGE_TARNAME using
+# v0.16.0-1snapshot-DEV-20-g8c99110-1-gc8ea7a1
+# Generated ./configure
+
+#+end_src
+
+* configure.sh
+
+#+BEGIN_SRC shell :tangle "configure.sh" :shebang #!/bin/sh
+GERBIL_SOURCE="${1:-`pwd`}"
+
+# Our ./configure is generated from configure.ac. In that file there's a line,
+# AC_INIT(Gerbil,v0,me@drewc.ca,gerbil-v0), that specifies the version.
+
+# Gerbil gets its version from the last tag in the tree. We'll replace that line
+# with the version.
+
+replace_version () {
+    GERBIL_VERSION=`cd ${GERBIL_SOURCE} && git describe --tags`
+    echo "Replacing PACKAGE_VERSION and PACKAGE_TARNAME using ${GERBIL_VERSION}"
+    sed -r -i "s/(AC_INIT[(]Gerbil,).*(,me@drewc.ca,gerbil-).*[)]/\1${GERBIL_VERSION}\2${GERBIL_VERSION})/" $1
+}
+
+# But, even before that, the configure.ac and Makefile.in are generated from
+# configure.org. 
+
+tangle() {
+    emacs --batch -l org --eval "(org-babel-tangle-file \"$1\")"
+}
+
+# Once all that is done, run autoconf. 
+
+cd $GERBIL_SOURCE && tangle configure.org && replace_version configure.ac && autoconf
+
+echo Generated ./configure
+#+END_SRC
+
+
+* configure.ac
+
+Here are the file components. We have ~--enable*~ and --~disable-*~ for a tonne.
+
+#+NAME: configure.ac
+ #+BEGIN_SRC autoconf
+AC_INIT(Gerbil,v0,me@drewc.ca,gerbil-v0)
+PACKAGE_SHORTNAME="gerbil"
+
+AC_SUBST(PACKAGE_SHORTNAME)
+AC_SUBST(PACKAGE_NAME)
+AC_SUBST(PACKAGE_VERSION)
+AC_SUBST(PACKAGE_STRING)
+AC_SUBST(PACKAGE_BUGREPORT)
+AC_SUBST(PACKAGE_TARNAME)
+
+AC_COPYRIGHT([[Copyright (c) 2019 by drewc <me@drewc.ca>, All Rights Reserved.]])
+
+ #+END_SRC
+
+*** --enable-[zlib, lmdb, leveldb, mysql, ...]
+
+In ~src/std/build-features.ss~, the building of libraries is toggled. 
+
+"If a software package has optional compile-time features, the user can give
+configure command line options to specify whether to compile them. The options
+have one of these forms:
+  
+   --enable-feature[=arg]
+   --disable-feature" --[[https://www.gnu.org/software/autoconf/manual/autoconf.html#Package-Options][autoconf manual]]
+
+~— Macro: AC_ARG_ENABLE (feature, help-string, [action-if-given], [action-if-not-given])~
+#+NAME: configure-libs
+#+BEGIN_SRC autoconf
+# Libxml
+AC_ARG_ENABLE(libxml,
+AC_HELP_STRING([--enable-libxml],
+[build std/xml libraries - requires libxml2 (default is NO)]),
+ENABLE_LIBXML=$enableval,
+ENABLE_LIBXML=no)
+
+if test "$ENABLE_LIBXML" = yes; then
+sed -i -e 's|enable libxml #f|enable libxml #t|g' src/std/build-features.ss || true
+LIBS="$LIBS -lxml2"
+else
+sed -i -e 's|enable libxml #t|enable libxml #f|g' src/std/build-features.ss || true
+fi
+
+# Libyaml
+AC_ARG_ENABLE(libyaml,
+AC_HELP_STRING([--enable-libyaml],
+[build std/text/yaml libraries - requires libyaml (default is NO)]),
+ENABLE_LIBYAML=$enableval,
+ENABLE_LIBYAML=no)
+
+if test "$ENABLE_LIBYAML" = yes; then
+sed -i -e 's|enable libyaml #f|enable libyaml #t|g' src/std/build-features.ss || true
+LIBS="$LIBS -lyaml"
+else
+sed -i -e 's|enable libyaml #t|enable libyaml #f|g' src/std/build-features.ss || true
+fi
+
+# Zlib
+AC_ARG_ENABLE(zlib,
+AC_HELP_STRING([--disable-zlib],
+[build std/text/zlib libraries - requires zlib (default is --enable-zlib]),
+ENABLE_ZLIB=$enableval,
+ENABLE_ZLIB=yes)
+
+if test "$ENABLE_ZLIB" = yes; then
+sed -i -e 's|enable zlib #f|enable zlib #t|g' src/std/build-features.ss || true
+LIBS="$LIBS -lz"
+else
+sed -i -e 's|enable zlib #t|enable zlib #f|g' src/std/build-features.ss || true
+fi
+
+# Sqlite
+AC_ARG_ENABLE(sqlite,
+AC_HELP_STRING([--disable-sqlite],
+[build std/xml libraries - requires sqlite3 (default is --enable-sqlite)]),
+ENABLE_SQLITE=$enableval,
+ENABLE_SQLITE=yes)
+if test "$ENABLE_SQLITE" = yes; then
+sed -i -e 's|enable sqlite #f|enable sqlite #t|g' src/std/build-features.ss || true
+else
+sed -i -e 's|enable sqlite #t|enable sqlite #f|g' src/std/build-features.ss || true
+fi
+
+# Mysql
+AC_ARG_ENABLE(mysql,
+AC_HELP_STRING([--enable-mysql],
+[build std/xml libraries - requires mysql (default is NO)]),
+ENABLE_MYSQL=$enableval,
+ENABLE_MYSQL=no)
+
+if test "$ENABLE_MYSQL" = yes; then
+sed -i -e 's|enable mysql #f|enable mysql #t|g' src/std/build-features.ss || true
+else
+sed -i -e 's|enable mysql #t|enable mysql #f|g' src/std/build-features.ss || true
+fi
+
+# Lmdb
+AC_ARG_ENABLE(lmdb,
+AC_HELP_STRING([--enable-lmdb],
+[build std/xml libraries - requires lmdb2 (default is NO)]),
+ENABLE_LMDB=$enableval,
+ENABLE_LMDB=no)
+
+if test "$ENABLE_LMDB" = yes; then
+sed -i -e 's|enable lmdb #f|enable lmdb #t|g' src/std/build-features.ss || true
+LIBS="$LIBS -llmdb" 
+else
+sed -i -e 's|enable lmdb #t|enable lmdb #f|g' src/std/build-features.ss || true
+fi
+
+# Leveldb
+AC_ARG_ENABLE(leveldb,
+AC_HELP_STRING([--enable-leveldb],
+[build std/xml libraries - requires leveldb2 (default is NO)]),
+ENABLE_LEVELDB=$enableval,
+ENABLE_LEVELDB=no)
+
+if test "$ENABLE_LEVELDB" = yes; then
+sed -i -e 's|enable leveldb #f|enable leveldb #t|g' src/std/build-features.ss || true
+LIBS="$LIBS -lleveldb"
+else
+sed -i -e 's|enable leveldb #t|enable leveldb #f|g' src/std/build-features.ss || true
+fi
+
+#+END_SRC
+
+*** /file/ configure.ac
+
+#+BEGIN_SRC autoconf :noweb yes :tangle configure.ac
+# Configure template for Gerbil system.
+# Tangled using Org Mode (C-c C-v t) from configure.org
+# $ tangle() {
+#    emacs --batch -l org --eval "(org-babel-tangle-file \"$1\")"
+# }
+# $ tangle configure.org
+
+# Copyright (c) 2019 by drewc <me@drewc.ca>, All Rights Reserved.
+
+# Process this file with autoconf to produce a configure script.
+
+<<configure.ac>>
+
+<<configure-libs>>
+
+AC_OUTPUT(Makefile) 
+#+END_SRC
+
+
+* Makefile.in
+
+We want a Makefile. The way this has worked over the last half-century or so is
+that we write scripts on scripts on scripts. This is no exception.
+
+** Version file: ./src/gerbil/runtime/gx-version.scm
+
+Essentially, that file only exists for releases. For "snapshots", that is to say
+building master and the like, that file does not exist and is generated from a
+git tag.
+
+That's all fine and dandy, but a source tarball does not include the .git/,
+which means it fails when trying to build a distribution package that expects to
+be built from an upstream tarball and diffs. sigh.
+
+As luck from programming gods would have it, we have ~PACKAGE_VERSION~ in our
+configure.
+
+#+name: ensure-gx-version
+#+begin_src makefile
+ensure-gx-version: 
+# If the ./.git/ exists, the build will do it.
+	if test ! -d ./.git ; then \
+		echo "(define (gerbil-version-string) \"$(PACKAGE_VERSION)\")" \
+	     > ./src/gerbil/runtime/gx-version.scm ; \
+	 fi
+#+end_src
+
+** /file/ Makefile.in
+
+#+BEGIN_SRC makefile :noweb yes :tangle Makefile.in
+# Makefile Template for Gerbil
+# Tangled using Org Mode (C-c C-v t) from configure.org
+# $ tangle() {
+#    emacs --batch -l org --eval "(org-babel-tangle-file \"$1\")"
+# }
+# $ tangle configure.org
+
+# Copyright (c) 2019 by drewc <me@drewc.ca>, All Rights Reserved.
+
+# The Makefile is generated by running ./configure
+
+PACKAGE_SHORTNAME = @PACKAGE_SHORTNAME@
+PACKAGE_NAME = @PACKAGE_NAME@
+PACKAGE_VERSION = @PACKAGE_VERSION@
+PACKAGE_STRING = @PACKAGE_STRING@
+PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
+PACKAGE_TARNAME = @PACKAGE_TARNAME@
+
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+includedir = @includedir@
+libdir = @libdir@
+bindir = @bindir@
+docdir = @docdir@
+infodir = @infodir@
+emacsdir = @emacsdir@
+libexecdir = @libexecdir@
+datarootdir = @datarootdir@
+datadir = @datadir@
+htmldir = @htmldir@
+dvidir = @dvidir@
+pdfdir = @pdfdir@
+psdir = @psdir@
+localedir = @localedir@
+mandir = @mandir@
+
+LIBS = @LIBS@
+
+gerbil_home = "${DESTDIR}/${prefix}/lib/${PACKAGE_SHORTNAME}"
+gerbil_bin = "${gerbil_home}/bin"
+gerbil_lib = "${gerbil_home}/lib"
+gerbil_bin_linkdir = "${DESTDIR}/${prefix}/bin"
+
+
+gerbil: ensure-gx-version
+	cd src && LDFLAGS="$(LIBS)" ./build.sh
+
+<<ensure-gx-version>>
+
+stdlib:
+	cd src && LDFLAGS="$(LIBS)" ./build.sh stdlib
+
+lang:
+	cd src && LDFLAGS="$(LIBS)" ./build.sh lang
+
+
+r7rs-large:
+	cd src && LDFLAGS="$(LIBS)" ./build.sh r7rs-large
+
+tools:
+	cd src && LDFLAGS="$(LIBS)" ./build.sh tools
+
+stage0:
+	cd src && .LDFLAGS="$(LIBS)" /build.sh stage0
+
+stage1:
+	cd src && .LDFLAGS="$(LIBS)" /build.sh stage1
+
+layout:
+	cd src && .LDFLAGS="$(LIBS)" /build.sh layout
+
+tags:
+	cd src && .LDFLAGS="$(LIBS)" /build.sh tags
+
+install:
+# Symlinks
+	mkdir -p ${gerbil_bin} ;
+	mkdir -p ${gerbil_lib} ;
+	cp -a bin/* ${gerbil_bin} ;
+	cp -a lib/* ${gerbil_lib} ;
+	@for i in `find ${gerbil_bin} -type f` ; do \
+	  _name=`basename $$i`;\
+    _link="${gerbil_bin_linkdir}/$$_name" ; \
+	  mkdir -p "${gerbil_bin_linkdir}"; \
+	  if test -f $$_link ; then rm "$$_link" ; fi ;\
+    echo "Linking $$_link to $$i"; \
+	  ln -sr $$i "$$_link" ; \
+	done ;
+
+
+uninstall:
+# Symlinks
+	@for i in `find ${gerbil_bin} -type f` ; do \
+	  _name=`basename $$i`;\
+	  _link="${gerbil_bin_linkdir}/$$_name" ; \
+	  if test -L $$_link && test $$(dirname `readlink $$_link`) = ${gerbil_bin}; then \
+	     echo removing "$$_link" ; rm "$$_link" ; elif test -f "$$_link" ; then echo $$_link is not a link to $$i. Not removing. ; fi ; \
+	done ;
+
+	rm -rf ${gerbil_home};
+
+test: 
+	echo $(LIBS) ;
+
+#+END_SRC
+
+
+
+* Legalese
+  :PROPERTIES:
+  :COPYING: t
+  :END:
+
+  Copyright © Drew Crampsie <me@drewc.ca>, All Right Reserved.
+
+  Code is licensed according to where it is tangled and what [[#debian_copyright][debian/copyright]]
+  has to say.
+
+
+# Local Variables:
+# org-src-tab-acts-natively: t
+# org-src-preserve-indentation: t
+# End:

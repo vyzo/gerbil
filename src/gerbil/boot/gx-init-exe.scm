@@ -17,10 +17,19 @@
 (define __gx#method-ref #f)
 
 (define (_gx#load-runtime!)
+  (define (gxi_GERBIL_HOME)
+    (let* ((result.string (shell-command "gxi --home" #t))
+           (result (car result.string))
+           (home (cdr result.string)))
+      (if (zero? result)
+        home
+        #f)))
+
   (let* ((home
           (path-normalize
            (cond
             ((getenv "GERBIL_HOME" #f) => values)
+            ((gxi_GERBIL_HOME) => values)
             (else
              (error "Cannot determine GERBIL_HOME")))))
          (libdir

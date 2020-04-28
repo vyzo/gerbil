@@ -1,0 +1,24 @@
+#+diff --git a/src/gerbil/boot/gx-init-exe.scm b/src/gerbil/boot/gx-init-exe.scm
+index 7e23c34..3a141b5 100644
+--- a/src/gerbil/boot/gx-init-exe.scm
++++ b/src/gerbil/boot/gx-init-exe.scm
+@@ -17,10 +17,19 @@
+ (define __gx#method-ref #f)
+ 
+ (define (_gx#load-runtime!)
++  (define (gxi_GERBIL_HOME)
++    (let* ((result.string (shell-command "gxi --home" #t))
++           (result (car result.string))
++           (home (cdr result.string)))
++      (if (zero? result)
++        home
++        #f)))
++
+   (let* ((home
+           (path-normalize
+            (cond
+             ((getenv "GERBIL_HOME" #f) => values)
++            ((gxi_GERBIL_HOME) => values)
+             (else
+              (error "Cannot determine GERBIL_HOME")))))
+          (libdir

@@ -1,9 +1,46 @@
 #!/bin/sh
-set -e
+set -eu
 
-if [ -z "$GERBIL_HOME" ]; then
-    GERBIL_HOME=$(dirname $(cd ${0%/*} && echo $PWD))
+
+if [ -z "${GERBIL_HOME:-}" ]; then
+
+    # First, try whereis. We are looking for $GERBIL_HOME/lib/std, our stdlib
+    for gh in $(whereis -b gerbil |cut -d: -f2); do
+        if [ -d $gh/lib/std ]; then
+            GERBIL_HOME="$gh" ; break ;
+        fi;
+    done
+
+    # if that did not work, find out where we are and try that.
+    if [ -z "${GERBIL_HOME:-}" ]; then
+        GERBIL_BIN_LOCATION="$0"
+
+        # Check if we're a symlink
+        GERBIL_LINK=$(readlink $GERBIL_BIN_LOCATION || true)
+        while true
+        do
+            # If not, "../" is our home
+            if [ -z "$GERBIL_LINK" ]; then
+                GERBIL_HOME=$(dirname $(cd ${GERBIL_BIN_LOCATION%/*} && echo $PWD))
+                break;
+            else
+                # if we're a link, go down the chain.
+                GERBIL_BIN_LOCATION=$GERBIL_LINK
+                GERBIL_LINK=$(readlink "$GERBIL_LINK" || true);
+            fi
+        done
+    fi
     export GERBIL_HOME
+fi
+
+
+if [ $# -gt 0 ]; then
+    case $1 in
+        --home)
+            echo -n $GERBIL_HOME;
+            exit 0;
+            ;;
+    esac
 fi
 
 if [ $# -gt 0 ]; then
@@ -37,7 +74,7 @@ if [ $# -gt 0 ]; then
 fi
 
 if [ $# -eq 0 ]; then
-    exec gsi $GSIOPTIONS "$GERBIL_HOME/lib/gxi-init" "$GERBIL_HOME/lib/gxi-interactive" -
+    exec gsi ${GSIOPTIONS:-} $GERBIL_HOME/lib/gxi-init $GERBIL_HOME/lib/gxi-interactive -
 else
-    exec gsi $GSIOPTIONS "$GERBIL_HOME/lib/gxi-init" "$@"
+    exec gsi ${GSIOPTIONS:-} $GERBIL_HOME/lib/gxi-init "$@"
 fi
