@@ -52,11 +52,16 @@
       ;;    If no cleanup function is provided, a c function is created <struct-name>_ffi_free
       ;;    this function frees the struct pointer as well as any string members if
       ;;    they were set.
-      (define-macro (define-c-struct struct #!optional (members '()) release-function)
+      ;; compatible-tags => list of symbols representing additional C type declarations compatible with struct
+      ;;    This is usually the name of a typedef alias, when it differs from the C struct tag.
+      ;; as-typedef => set to #t when defining an anonymous typdef'd struct
+      ;;    In this case, `struct` should be the name of the typedef alias.
+      (define-macro (define-c-struct struct #!optional (members '()) release-function compatible-tags as-typedef)
         (let* ((struct-str (symbol->string struct))
                (struct-ptr (string->symbol (string-append struct-str "*")))
                (shallow-ptr (string->symbol (string-append struct-str "-shallow-ptr*")))
                (borrowed-ptr (string->symbol (string-append struct-str "-borrowed-ptr*")))
+               (struct-keyword? (if as-typedef "" "struct "))
                (string-types '(char-string nonull-char-string UTF-8-string
                                            nonnull-UTF-8-string UTF-16-string
                                            nonnull-UTF16-string))
@@ -78,7 +83,7 @@
                (default-free-body (and string-compat-required?
                                        (string-append
                                         "___SCMOBJ " struct-str "_ffi_free (void *ptr) {" "\n"
-                                        "struct " struct-str " *obj = (struct " struct-str "*) ptr;" "\n"
+                                        struct-keyword? struct-str " *obj = (" struct-keyword? struct-str "*) ptr;" "\n"
                                         (apply string-append
                                           (map (lambda (m)
                                                  (cond 
@@ -99,52 +104,54 @@
                (string-compat-types (if string-compat-required?
                                       `((c-declare ,default-free-body)
                                         (c-define-type ,shallow-ptr
-						       (pointer ,struct (,struct-ptr) "ffi_free")))
-				      '())))
-          `(begin (c-define-type ,struct (struct ,struct-str))
+                                                       (pointer ,struct (,struct-ptr) "ffi_free")))
+                                      '()))
+               (compatible-tags (or compatible-tags '()))
+               (ptr-tags (map (lambda (t) (string->symbol (string-append (symbol->string t) "*"))) compatible-tags)))
+
+          `(begin (c-define-type ,struct (,(if as-typedef 'type 'struct) ,struct-str (,struct ,@compatible-tags)))
                   (c-define-type ,struct-ptr
-                                 (pointer ,struct (,struct-ptr) ,release-function))
+                                 (pointer ,struct (,struct-ptr ,@ptr-tags) ,release-function))
                   (c-define-type ,borrowed-ptr (pointer ,struct (,struct-ptr)))
 
-		  ,@string-compat-types
+                  ,@string-compat-types
 
 
-		  (define ,(string->symbol (string-append struct-str "-ptr?"))
+                  (define ,(string->symbol (string-append struct-str "-ptr?"))
                     (lambda (obj)
                       (and (foreign? obj)
-                         (equal? (foreign-tags obj) (quote (,struct-ptr))))))
+                           (member (quote ,struct-ptr) (foreign-tags obj)))))
 
                   ;; getter and setters
                   ,@(apply append
-		      (map (lambda (m)
-			     (let* ((member-name (symbol->string (car m)))
-				    (member-type (cdr m))
-				    (getter-name (string-append struct-str "-" member-name))
-				    (setter-body (cond
-						  ((member member-type string-types)
-						   (string-setter-body member-name))
-						  (else
-						   (string-append
-						    "___arg1->" member-name " = ___arg2;" "\n"
-						    "___return;" "\n")))))
-			       `((define ,(string->symbol getter-name)
-				   (c-lambda (,struct-ptr) ,member-type
-					,(string-append
-					  "___return(___arg1->" member-name ");")))
+                      (map (lambda (m)
+                             (let* ((member-name (symbol->string (car m)))
+                                    (member-type (cdr m))
+                                    (getter-name (string-append struct-str "-" member-name))
+                                    (setter-body (cond
+                                                   ((member member-type string-types)
+                                                    (string-setter-body member-name))
+                                                   (else
+                                                    (string-append
+                                                      "___arg1->" member-name " = ___arg2;" "\n"
+                                                      "___return;" "\n")))))
+                               `((define ,(string->symbol getter-name)
+                                   (c-lambda (,struct-ptr) ,member-type
+                                     ,(string-append "___return(___arg1->" member-name ");")))
 
-				 (define ,(string->symbol (string-append getter-name "-set!"))
-				   (c-lambda (,struct-ptr ,member-type) void
-					,setter-body)))))
-			   members))
+                                 (define ,(string->symbol (string-append getter-name "-set!"))
+                                   (c-lambda (,struct-ptr ,member-type) void
+                                     ,setter-body)))))
+                           members))
 
                   ;; malloc
                   (define ,(string->symbol (string-append "malloc-" struct-str))
                     (c-lambda () ,struct-ptr
                          ,(string-append
-                           "struct " struct-str "* var = (struct " struct-str " *) malloc(sizeof(struct " struct-str "));" "\n"
+                           struct-keyword? struct-str "* var = (" struct-keyword? struct-str " *) malloc(sizeof(" struct-keyword? struct-str "));" "\n"
                           "if (var == NULL)" "\n"
                           "    ___return (NULL);" "\n"
-			  "memset(var, 0, sizeof(struct " struct-str "));"
+                          "memset(var, 0, sizeof(" struct-keyword? struct-str "));"
                           "___return(var);")))
 
                   (define ,(string->symbol (string-append "ptr->" struct-str))
@@ -155,10 +162,10 @@
                   (define ,(string->symbol (string-append "malloc-" struct-str "-array"))
                     (c-lambda (unsigned-int32) ,(if string-compat-required? shallow-ptr struct-ptr)
                          ,(string-append
-                           "struct " struct-str " *arr_var=(struct " struct-str " *) malloc(___arg1*sizeof(struct " struct-str "));" "\n"
+                           struct-keyword? struct-str " *arr_var=(" struct-keyword? struct-str " *) malloc(___arg1*sizeof(" struct-keyword? struct-str "));" "\n"
                            "if (arr_var == NULL)" "\n"
                            "    ___return (NULL);" "\n"
-			   "memset(arr_var, 0, ___arg1*sizeof(struct " struct-str "));" "\n"
+                           "memset(arr_var, 0, ___arg1*sizeof(" struct-keyword? struct-str "));" "\n"
                            "___return(arr_var);")))
 
                   ;; ref array

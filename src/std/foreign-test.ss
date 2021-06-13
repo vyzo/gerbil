@@ -1,5 +1,6 @@
 (import :std/foreign
-        :std/test)
+        :std/test
+        (only-in :gerbil/gambit foreign-tags))
 
 (export foreign-test)
 
@@ -7,7 +8,12 @@
             (struct abc a b)
             (struct foo a1 d2 str)
             (struct bar i j)
-            g)
+            g
+            (struct a_struct g h)
+            (struct anon_struct a b)
+            in-struct-out-alias
+            in-alias-out-struct
+            )
   (c-declare "
 struct abc {
     char* a;
@@ -26,6 +32,32 @@ struct bar {
 int i;
 int j;
 };
+
+typedef struct a_struct {
+  int g;
+  int h;
+} an_alias;
+
+typedef struct {
+  char* a;
+  char* b;
+  char* c;
+} anon_struct;
+
+an_alias *in_struct_out_alias(struct a_struct *s) {
+  an_alias* a = (an_alias *) malloc(sizeof(an_alias));
+  a->g = s->g;
+  a->h = 77;
+  return a;
+}
+
+struct a_struct *in_alias_out_struct(an_alias *a) {
+  struct a_struct* s = (struct a_struct *) malloc(sizeof(struct a_struct));
+  s->g = a->h;
+  s->h = a->g;
+  return s;
+}
+
 ")
 
 
@@ -39,7 +71,18 @@ int j;
                         (d2 . abc*)
                         (str . char-string)))
   (define-c-struct bar ((i . int)
-                        (j . int))))
+                        (j . int)))
+  
+  (c-define-type an-alias (type "an_alias" (an_alias a_struct)))
+  (c-define-type an-alias* (pointer an-alias (an_alias* a_struct*)))
+  (define-c-struct a_struct
+    ((g . int) (h . int))
+    #f (an_alias))
+  (define-c-struct anon_struct
+    ((a . char-string) (b . char-string))
+    #f #f #t)
+  (define-c-lambda in-struct-out-alias (a_struct*) an-alias* "in_struct_out_alias")
+  (define-c-lambda in-alias-out-struct (an-alias*) a_struct* "in_alias_out_struct"))
 
 (define foreign-test
   (test-suite "test :std/foreign"
@@ -62,7 +105,32 @@ int j;
                          (check (abc-a obj) => test-str1)
                          (check (abc-b obj) => test-str2)
 
-                         (check (abc-ptr? obj) => #t))
+                         (check (abc-ptr? obj) => '(abc*)))
+
+              (test-case "c struct compatible-tags"
+                         (def in-struct (malloc-a_struct))
+                         (check (member 'an_alias* (foreign-tags in-struct)) => '(an_alias*))
+                         (a_struct-g-set! in-struct 99)
+
+                         (def out-alias (in-struct-out-alias in-struct))
+                         (check (a_struct-ptr? out-alias) => '(a_struct*))
+                         (check (a_struct-g out-alias) => (a_struct-g in-struct))
+                         (check (a_struct-h out-alias) => 77)
+
+                         (def out-struct (in-alias-out-struct out-alias))
+                         (check (a_struct-g out-struct) => (a_struct-h out-alias))
+                         (check (a_struct-h out-struct) => (a_struct-g in-struct)))
+
+              (test-case "c struct as-typedef"
+                         (def obj (malloc-anon_struct))
+
+                         (anon_struct-a-set! obj test-str1)
+                         (anon_struct-b-set! obj test-str2)
+
+                         (check (anon_struct-a obj) => test-str1)
+                         (check (anon_struct-b obj) => test-str2)
+
+                         (check (anon_struct-ptr? obj) => '(anon_struct*)))
 
               (test-case "c struct array"
 
