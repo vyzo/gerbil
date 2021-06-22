@@ -3,6 +3,7 @@
 ;;; synchronous sockets  -- kqueue server implementation
 
 (require bsd)
+
 (import :gerbil/gambit/threads
         :gerbil/gambit/ports
         :gerbil/gambit/misc
@@ -11,33 +12,42 @@
         :std/os/fd
         :std/os/kqueue
         :std/iter)
+
 (export kqueue-socket-server)
+
+(declare
+  (fixnum))
 
 (def (kqueue-socket-server)
   (def fdtab (make-hash-table-eq))
   (def kq (kqueue))
   (def maxevts 8192)
   (def evts (make-kevents maxevts))
-
-  (def ev-in (##fxior EVFILT_READ EV_EOF EV_ERROR))
-  (def ev-out (##fxior EVFILT_WRITE EV_EOF EV_ERROR))
+  (def nchanges 0)
 
   (def (do-kevent)
-    (let (count (kqueue-poll kq evts maxevts))
+    (let (count (kevent kq evts nchanges evts maxevts))
       (when (##fxpositive? count)
         (let lp ((k 0))
           (when (##fx< k count)
-            (let ((fd (kevent-ident evts k))
-                  (ready (kevent-flags evts k)))
-              (with ((!socket-state _ io-in io-out)
-                     (hash-ref fdtab fd))
-                (unless (##fxzero? (##fxand ready ev-in))
-                  (when io-in
-                    (io-state-signal-ready! io-in 'ready)))
-                (unless (##fxzero? (##fxand ready ev-out))
-                  (when io-out
-                    (io-state-signal-ready! io-out 'ready)))
-                (lp (##fx+ k 1)))))))))
+            (with ((!socket-state _ io-in io-out)
+                   (hash-ref fdtab (kevent-ident evts k)))
+              (let ((filter (kevent-filter evts k)))
+                (cond
+                  ((and io-in (##fx= filter EVFILT_READ))
+                   (io-state-signal-ready! io-in 'ready))
+                  ((and io-out (##fx= filter EVFILT_WRITE))
+                   (io-state-signal-ready! io-out 'ready)))))
+            (lp (fx1+ k)))))))
+
+  (def (event-set! ident filter flags filter-flags data)
+    (kevent-set! evts nchanges
+                 ident: ident
+                 filter: filter
+                 flags: flags
+                 filter-flags: filter-flags
+                 data: data)
+    (set! nchanges (fx1+ nchanges)))
 
   (def (add-socket sock)
     (let* ((self (current-thread))
@@ -62,25 +72,16 @@
            (ssock
             (make-!socket sock wait-in wait-out close))
            (state
-            (make-!socket-state sock io-in io-out))
-           (nchanges 0))
+            (make-!socket-state sock io-in io-out)))
       (when io-in
-        (kevent-set! evts nchanges
-         ident: (fd-e sock)
-         filter: EVFILT_READ
-         flags: (##fxior EV_ADD EV_CLEAR)
-         filter-flags: NOTE_LOWAT
-         data: 1)
-        (set! nchanges (1+ nchanges)))
+        (event-set! (fd-e sock) EVFILT_READ (##fxior EV_ADD EV_CLEAR)
+                    NOTE_LOWAT 1))
       (when io-out
-        (kevent-set! evts nchanges
-         ident: (fd-e sock)
-         filter: EVFILT_WRITE
-         flags: (##fxior EV_ADD EV_CLEAR)
-         filter-flags: NOTE_LOWAT
-         data: 1)
-        (set! nchanges (1+ nchanges)))
+        (event-set! (fd-e sock) EVFILT_WRITE (##fxior EV_ADD EV_CLEAR)
+                    NOTE_LOWAT 1))
+      ; register the events before the next call to ##wait-for-io!
       (kevent kq evts nchanges #f 0)
+      (set! nchanges 0)
       (make-will ssock (cut close <> 'inout #f))
       (hash-put! fdtab fd state)
       ssock))
@@ -98,38 +99,20 @@
             ((!socket-state _ io-in io-out)
              (case dir
                ((in)
-                (if io-out
-                  (kqueue-kevent-disable kq sock EVFILT_READ)
-                  (begin
-                    (kqueue-kevent-del kq sock EVFILT_READ)
-                    (hash-remove! fdtab (fd-e sock))))
                 (set! (!socket-wait-in ssock) #f)
                 (set! (!socket-state-io-in state) #f)
                 (close-io-in! io-in sock)
                 (unless io-out
+                  (hash-remove! fdtab (fd-e sock))
                   (close-port sock)))
                ((out)
-                (if io-in
-                  (kqueue-kevent-disable kq sock EVFILT_WRITE)
-                  (begin
-                    (kqueue-kevent-del kq sock EVFILT_WRITE)
-                    (hash-remove! fdtab (fd-e sock))))
                 (set! (!socket-wait-out ssock) #f)
                 (set! (!socket-state-io-out state) #f)
                 (close-io-out! io-out sock)
                 (unless io-in
+                  (hash-remove! fdtab (fd-e sock))
                   (close-port sock)))
                ((inout)
-                (kevent-set! evts 0
-                 ident: (fd-e sock)
-                 filter: EVFILT_READ
-                 flags: EV_DELETE)
-                (kevent-set! evts 1
-                 ident: (fd-e sock)
-                 filter: EVFILT_WRITE
-                 flags: EV_DELETE)
-                (kevent kq evts 2 #f 0)
-                (hash-remove! fdtab (fd-e sock))
                 (when io-in
                   (set! (!socket-wait-in ssock) #f)
                   (set! (!socket-state-io-in state) #f)
@@ -138,6 +121,7 @@
                   (set! (!socket-wait-out ssock) #f)
                   (set! (!socket-state-io-out state) #f)
                   (close-io-out! io-out sock))
+                (hash-remove! fdtab (fd-e sock))
                 (close-port sock))
                (else
                 (error "Bad direction" dir))))

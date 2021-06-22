@@ -333,10 +333,17 @@
   (define-c-lambda kevent_data_set (kevent* int int64) void
     "___arg1[___arg2].data = ___arg3; ___return;")
 
-  (define-c-lambda kevent_udata (kevent* int) (pointer void)
-    "___return (___arg1[___arg2].udata);")
-  (define-c-lambda kevent_udata_set (kevent* int (pointer void)) void
-    "___arg1[___arg2].udata = ___arg3; ___return;")
+  (cond-expand
+    (netbsd
+     (define-c-lambda kevent_udata (kevent* int) int
+       "___return (___arg1[___arg2].udata);")
+     (define-c-lambda kevent_udata_set (kevent* int int) void
+       "___arg1[___arg2].udata = ___arg3; ___return;"))
+    (else
+     (define-c-lambda kevent_udata (kevent* int) int
+       "___return ((long)(___arg1[___arg2].udata));")
+     (define-c-lambda kevent_udata_set (kevent* int int) void
+       "___arg1[___arg2].udata = (void *)((long)___arg3); ___return;")))
 
   (define-c-lambda ev_set
     (kevent* int unsigned-int short unsigned-short unsigned-int int64 (pointer void)) void
