@@ -23,8 +23,11 @@
   let-hash
   awhen
   chain
-  is)
+  is
+  fn
+  )
 
+(defalias fn lambda)
 (defrules defrule ()
   ((_ (name args ...) body ...)
    (defrules name () ((name args ...) body ...))))

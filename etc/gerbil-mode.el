@@ -272,7 +272,7 @@
                 match match*
                 with with*
                 let/cc let/esc
-                lambda%
+                lambda% fn
                 chain
                 identifier-rules
                 letrec*
@@ -306,7 +306,7 @@
                        "module" "extern" "cond-expand" "require" "provide"
                        "if" "apply" "eval" "set!"
                        "when" "unless" "not"
-                       "case-lambda"
+                       "case-lambda" "fn"
                        "core-syntax-case" "core-ast-case"
                        "syntax-case" "ast-case" "ast-rules"
                        "identifier-rules"

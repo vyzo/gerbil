@@ -237,3 +237,20 @@ if passed to the macro as value and not as variable. Alternatively, the
 ("Documents" "Pictures" "Videos" "Music")
 ```
 :::
+
+### fn
+``` scheme
+(defalias fn lambda)
+```
+
+Short for `lambda`.
+
+::: tip Examples:
+``` scheme
+> (map (fn (v) (* v (1+ v))) [1 2 3])
+(2 6 12)
+
+> ((fn args (displayln args)) 1 2 3)
+(1 2 3)
+```
+:::
